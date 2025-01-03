@@ -14,6 +14,6 @@ int main() {
     std::cout << "---\n";
     auto it = iv.erase(iv.cbegin() + 1, iv.cbegin() + 3);
     std::cout << *it << '\n';
-    std::cout << "---\n";
+    std::cout << "--- first and last left:\n";
     for(auto& str : iv) std::cout << str << '\n';
 }

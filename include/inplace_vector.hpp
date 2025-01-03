@@ -40,6 +40,12 @@ For more information, please refer to <https://unlicense.org>
 #include <type_traits>
 #include <utility>
 
+#if __cplusplus >= 202002L
+# define INPLACE_VECTOR_HPP_CPP20CONSTEXPR constexpr
+#else
+# define INPLACE_VECTOR_HPP_CPP20CONSTEXPR
+#endif
+
 namespace cpp26 {
 
 template<class T, std::size_t N>
@@ -59,7 +65,7 @@ public:
 
 private:
     struct alignas(T) aligned_storage {
-        constexpr reference ref() { return *reinterpret_cast<pointer>(m_raw); }
+        constexpr reference ref() { return *std::launder(reinterpret_cast<pointer>(m_raw)); }
         constexpr const_reference ref() const { return *std::launder(reinterpret_cast<const_pointer>(m_raw)); }
 
         template<class... Args>
@@ -71,67 +77,119 @@ private:
     };
 
     constexpr void destroy_all() noexcept {
-        for(std::size_t idx = 0; idx < m_size; ++idx) {
+        for(size_type idx = 0; idx < m_size; ++idx) {
             m_data[idx].destroy();
         }
     }
 
 public:
+    // constructors
     constexpr inplace_vector() noexcept = default;
     constexpr explicit inplace_vector(size_type count) {
-        while(count--) emplace_back();
+        if(count > N) throw std::bad_alloc();
+        while(count--) emplace_back_unchecked();
     }
     constexpr inplace_vector(size_type count, const T& value) {
-        while(count--) push_back(value);
+        if(count > N) throw std::bad_alloc();
+        while(count--) push_back_unchecked(value);
     }
     template<class InputIt>
     constexpr inplace_vector(InputIt first, InputIt last) {
         std::copy(first, last, std::back_inserter(*this));
-        m_size = std::distance(first, last);
     }
 
+    // make copy/move use push_back_unchecked
     constexpr inplace_vector(const inplace_vector& other) : inplace_vector(other.begin(), other.end()) {}
 
-    constexpr inplace_vector(inplace_vector&& other) noexcept(N == 0 || std::is_nothrow_move_constructible_v<T>) :
-        inplace_vector(std::move_iterator(other.begin()), std::move_iterator(other.end())) {}
+    constexpr inplace_vector(inplace_vector&& other) noexcept(N == 0 || std::is_nothrow_move_constructible_v<T>) {
+        std::move(other.begin(), other.end(), std::back_inserter(*this));
+    }
 
+    // this needs to use the checked version though
     constexpr inplace_vector(std::initializer_list<T> init) : inplace_vector(init.begin(), init.end()) {}
 
-    ~inplace_vector() noexcept { destroy_all(); }
+    // destructor
+    INPLACE_VECTOR_HPP_CPP20CONSTEXPR ~inplace_vector() noexcept { destroy_all(); }
+
+    // assignment
+    constexpr inplace_vector& operator=(const inplace_vector& other) {
+        assign(other.begin(), other.end());
+        return *this;
+    }
+    constexpr inplace_vector& operator=(inplace_vector&& other) noexcept(N == 0 || (std::is_nothrow_move_assignable_v<T> &&
+                                                                                    std::is_nothrow_move_constructible_v<T>)) {
+        clear();
+        std::move(other.begin(), other.end(), std::back_inserter(*this));
+        return *this;
+    }
+    constexpr inplace_vector& operator=(std::initializer_list<T> init) {
+        if(init.size() > capacity()) throw std::bad_alloc();
+        assign(init.begin(), init.end());
+        return *this;
+    }
+    constexpr void assign(size_type count, const T& value) {
+        if(count > capacity()) throw std::bad_alloc();
+        clear();
+        while(count--) push_back(value);
+    }
+    template<class InputIt>
+    constexpr void assign(InputIt first, InputIt last) {
+        clear();
+        std::copy(first, last, std::back_inserter(*this));
+    }
+    constexpr void assign(std::initializer_list<T> ilist) {
+        clear();
+        std::copy(ilist.begin(), ilist.end(), std::back_inserter(*this));
+    }
+
+    //
     constexpr void clear() noexcept {
         destroy_all();
         m_size = 0;
     }
-    constexpr std::size_t size() const noexcept { return m_size; }
-    constexpr std::size_t capacity() const noexcept { return N; }
+    constexpr size_type size() const noexcept { return m_size; }
+    constexpr size_type capacity() const noexcept { return N; }
     constexpr bool empty() const noexcept { return m_size == 0; }
 
+private:
+    template<class... Args>
+    constexpr reference emplace_back_unchecked(Args&&... args) {
+        auto& rv = m_data[m_size].construct(std::forward<Args>(args)...);
+        ++m_size;
+        return rv;
+    }
+    constexpr reference push_back_unchecked(T const& value) {
+        auto& rv = m_data[m_size].construct(value);
+        ++m_size;
+        return rv;
+    }
+    constexpr reference push_back_unchecked(T&& value) {
+        auto& rv = m_data[m_size].construct(std::move(value));
+        ++m_size;
+        return rv;
+    }
+
+public:
     template<class... Args>
     constexpr reference emplace_back(Args&&... args) {
         if(m_size == N) throw std::bad_alloc();
-        auto& rv = m_data[m_size].construct(std::forward<Args>(args)...);
-        m_size++;
-        return rv;
+        return emplace_back_unchecked(std::forward<Args>(args)...);
     }
     constexpr reference push_back(T const& value) {
         if(m_size == N) throw std::bad_alloc();
-        auto& rv = m_data[m_size].construct(value);
-        m_size++;
-        return rv;
+        return push_back_unchecked(value);
     }
     constexpr reference push_back(T&& value) {
         if(m_size == N) throw std::bad_alloc();
-        auto& rv = m_data[m_size].construct(std::move(value));
-        m_size++;
-        return rv;
+        return push_back_unchecked(std::move(value));
     }
-    constexpr reference operator[](std::size_t idx) noexcept { return m_data[idx].ref(); }
-    constexpr const_reference operator[](std::size_t idx) const noexcept { return m_data[idx].ref(); }
-    constexpr reference at(std::size_t idx) {
+    constexpr reference operator[](size_type idx) noexcept { return m_data[idx].ref(); }
+    constexpr const_reference operator[](size_type idx) const noexcept { return m_data[idx].ref(); }
+    constexpr reference at(size_type idx) {
         if(idx >= m_size) throw std::out_of_range("");
         return m_data[idx].ref();
     }
-    constexpr const_reference at(std::size_t idx) const {
+    constexpr const_reference at(size_type idx) const {
         if(idx >= m_size) throw std::out_of_range("");
         return m_data[idx].ref();
     }
@@ -140,7 +198,7 @@ public:
         auto nclast = const_cast<iterator>(last);
         auto removed = std::distance(ncfirst, nclast);
         std::move(nclast, end(), ncfirst);
-        for(size_t idx = m_size - removed; idx < m_size; ++idx) {
+        for(size_type idx = m_size - removed; idx < m_size; ++idx) {
             m_data[idx].destroy();
         }
         m_size -= removed;
@@ -167,7 +225,7 @@ public:
 
 private:
     std::array<aligned_storage, N> m_data;
-    std::size_t m_size = 0;
+    size_type m_size = 0;
 };
 
 } // namespace cpp26
