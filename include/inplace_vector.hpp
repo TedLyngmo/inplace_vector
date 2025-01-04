@@ -35,6 +35,7 @@ For more information, please refer to <https://unlicense.org>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <iterator>
 #include <new>
 #include <stdexcept>
 #include <type_traits>
