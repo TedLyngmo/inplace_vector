@@ -77,10 +77,11 @@ private:
         std::byte m_raw[sizeof(T)];
     };
 
-    constexpr void destroy_all() noexcept {
-        for(size_type idx = 0; idx < m_size; ++idx) {
+    constexpr void shrink_by(size_type count) noexcept {
+        for(size_type idx = m_size - count; idx < m_size; ++idx) {
             m_data[idx].destroy();
         }
+        m_size -= count;
     }
 
 public:
@@ -110,7 +111,7 @@ public:
     constexpr inplace_vector(std::initializer_list<T> init) : inplace_vector(init.begin(), init.end()) {}
 
     // destructor
-    INPLACE_VECTOR_HPP_CPP20CONSTEXPR ~inplace_vector() noexcept { destroy_all(); }
+    INPLACE_VECTOR_HPP_CPP20CONSTEXPR ~inplace_vector() noexcept { clear(); }
 
     // assignment
     constexpr inplace_vector& operator=(const inplace_vector& other) {
@@ -144,13 +145,42 @@ public:
     }
 
     //
-    constexpr void clear() noexcept {
-        destroy_all();
-        m_size = 0;
-    }
-    constexpr size_type size() const noexcept { return m_size; }
-    constexpr size_type capacity() const noexcept { return N; }
     constexpr bool empty() const noexcept { return m_size == 0; }
+    constexpr size_type size() const noexcept { return m_size; }
+    static constexpr size_type max_size() noexcept { return N; }
+    static constexpr size_type capacity() noexcept { return N; }
+
+private:
+    constexpr void resize_unchecked(size_type count) {
+        if(count < size()) {
+            shrink_by(size() - count);
+        } else {
+            count -= size();
+            while(count--) {
+                emplace_back_unchecked();
+            }
+        }
+    }
+    constexpr void resize_unchecked(size_type count, const value_type& value) {
+        if(count < size()) {
+            shrink_by(size() - count);
+        } else {
+            count -= size();
+            while(count--) {
+                push_back_unchecked(value);
+            }
+        }
+    }
+
+private:
+    constexpr void resize(size_type count) {
+        if(count > capacity()) throw std::bad_alloc();
+        resize_unchecked(count);
+    }
+    constexpr void resize(size_type count, const value_type& value) {
+        if(count > capacity()) throw std::bad_alloc();
+        resize_unchecked(count, value);
+    }
 
 private:
     template<class... Args>
@@ -194,6 +224,11 @@ public:
         if(idx >= m_size) throw std::out_of_range("");
         return m_data[idx].ref();
     }
+
+    constexpr void pop_back() noexcept { shrink_by(1); }
+
+    constexpr void clear() noexcept { shrink_by(size()); }
+
     constexpr iterator erase(const_iterator first, const_iterator last) {
         auto ncfirst = const_cast<iterator>(first);
         auto nclast = const_cast<iterator>(last);
@@ -209,7 +244,22 @@ public:
 
     constexpr void swap(inplace_vector& other) noexcept(N == 0 || (std::is_nothrow_swappable_v<T> &&
                                                                    std::is_nothrow_move_constructible_v<T>)) {
-        // TODO
+        auto&& [small, large] = (size() < other.size()) ? std::pair<inplace_vector&, inplace_vector&>(*this, other)
+                                                        : std::pair<inplace_vector&, inplace_vector&>(other, *this);
+        size_type idx = 0, small_size = small.size();
+        for(; idx < small_size; ++idx) {
+            using std::swap;
+            swap(small[idx], large[idx]);
+        }
+        for(; idx < large.size(); ++idx) {
+            small.push_back(std::move(large[idx]));
+        }
+        large.resize_unchecked(small_size);
+    }
+    constexpr void friend swap(inplace_vector& lhs,
+                               inplace_vector& rhs) noexcept(N == 0 || (std::is_nothrow_swappable_v<T> &&
+                                                                        std::is_nothrow_move_constructible_v<T>)) {
+        lhs.swap(rhs);
     }
 
     constexpr reference front() { return m_data[0].ref(); }
