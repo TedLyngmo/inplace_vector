@@ -172,7 +172,7 @@ private:
         }
     }
 
-private:
+public:
     constexpr void resize(size_type count) {
         if(count > capacity()) throw std::bad_alloc();
         resize_unchecked(count);
