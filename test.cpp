@@ -15,6 +15,9 @@ int main() {
     assert(iv.size() == 4);
     for(auto& str : iv) std::cout << str << '\n';
     std::cout << "---\n";
+    std::cout << "Reverse order\n";
+    for (auto it = iv.crbegin(); it != iv.crend(); ++it) std::cout << *it << "\n";
+    std::cout << "---\n";
     auto it = iv.erase(iv.cbegin() + 1, iv.cbegin() + 3);
     assert(iv.size() == 2);
     std::cout << *it << '\n';

@@ -274,6 +274,13 @@ public:
     constexpr iterator begin() noexcept { return &m_data[0].ref(); }
     constexpr iterator end() noexcept { return &m_data[0].ref() + m_size; }
 
+    constexpr const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(cend()); }
+    constexpr const_reverse_iterator crend() const noexcept { return const_reverse_iterator(cbegin()); }
+    constexpr const_reverse_iterator rbegin() const noexcept { return crbegin(); }
+    constexpr const_reverse_iterator rend() const noexcept { return crend(); }
+    constexpr reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
+    constexpr reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
+
 private:
     std::array<aligned_storage, N> m_data;
     size_type m_size = 0;
