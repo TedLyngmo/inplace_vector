@@ -42,9 +42,9 @@ For more information, please refer to <https://unlicense.org>
 #include <utility>
 
 #if __cplusplus >= 202002L
-# define INPLACE_VECTOR_HPP_CPP20CONSTEXPR constexpr
+# define IPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8_CPP20CONSTEXPR constexpr
 #else
-# define INPLACE_VECTOR_HPP_CPP20CONSTEXPR
+# define IPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8_CPP20CONSTEXPR
 #endif
 
 namespace cpp26 {
@@ -111,7 +111,7 @@ public:
     constexpr inplace_vector(std::initializer_list<T> init) : inplace_vector(init.begin(), init.end()) {}
 
     // destructor
-    INPLACE_VECTOR_HPP_CPP20CONSTEXPR ~inplace_vector() noexcept { clear(); }
+    IPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8_CPP20CONSTEXPR ~inplace_vector() noexcept { clear(); }
 
     // assignment
     constexpr inplace_vector& operator=(const inplace_vector& other) {
