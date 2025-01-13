@@ -141,7 +141,7 @@ public:
     LYNIPV_CXX20_CONSTEXPR ~inplace_vector() noexcept { clear(); }
 
     // assignment
-    constexpr inplace_vector& operator=(const inplace_vector& other) {
+    LYNIPV_CXX14_CONSTEXPR inplace_vector& operator=(const inplace_vector& other) {
         assign(other.begin(), other.end());
         return *this;
     }
@@ -176,7 +176,7 @@ public:
         if(idx >= m_size) throw std::out_of_range("");
         return m_data[idx].ref();
     }
-    constexpr const_reference at(size_type idx) const {
+    LYNIPV_CXX14_CONSTEXPR const_reference at(size_type idx) const {
         if(idx >= m_size) throw std::out_of_range("");
         return m_data[idx].ref();
     }
@@ -302,7 +302,7 @@ public:
         m_size -= removed;
         return ncfirst;
     }
-    constexpr iterator erase(const_iterator pos) { return erase(pos, std::next(pos)); }
+    LYNIPV_CXX14_CONSTEXPR iterator erase(const_iterator pos) { return erase(pos, std::next(pos)); }
 
     LYNIPV_CXX14_CONSTEXPR void swap(inplace_vector& other) noexcept(N == 0 || (cpp26::is_nothrow_swappable<T>::value &&
                                                                                 std::is_nothrow_move_constructible<T>::value)) {
