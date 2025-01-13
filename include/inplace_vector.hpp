@@ -186,16 +186,16 @@ public:
     constexpr const_reference front() const { return m_data[0].ref(); }
     LYNIPV_CXX14_CONSTEXPR reference back() { return m_data[m_size - 1].ref(); }
     constexpr const_reference back() const { return m_data[m_size - 1].ref(); }
-    LYNIPV_CXX14_CONSTEXPR pointer data() noexcept { &m_data[0].ref(); }
-    LYNIPV_CXX14_CONSTEXPR const_pointer data() const noexcept { &m_data[0].ref(); }
+    LYNIPV_CXX14_CONSTEXPR pointer data() noexcept { return &m_data[0].ref(); }
+    LYNIPV_CXX14_CONSTEXPR const_pointer data() const noexcept { return &m_data[0].ref(); }
 
     // iterators
-    constexpr const_iterator cbegin() const noexcept { return &m_data[0].ref(); }
-    constexpr const_iterator cend() const noexcept { return &m_data[0].ref() + m_size; }
+    constexpr const_iterator cbegin() const noexcept { return data(); }
+    constexpr const_iterator cend() const noexcept { return std::next(cbegin(), static_cast<difference_type>(m_size)); }
     constexpr const_iterator begin() const noexcept { return cbegin(); }
     constexpr const_iterator end() const noexcept { return cend(); }
-    LYNIPV_CXX14_CONSTEXPR iterator begin() noexcept { return &m_data[0].ref(); }
-    LYNIPV_CXX14_CONSTEXPR iterator end() noexcept { return &m_data[0].ref() + m_size; }
+    LYNIPV_CXX14_CONSTEXPR iterator begin() noexcept { return data(); }
+    LYNIPV_CXX14_CONSTEXPR iterator end() noexcept { return std::next(begin(), static_cast<difference_type>(m_size)); }
 
     constexpr const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(cend()); }
     constexpr const_reverse_iterator crend() const noexcept { return const_reverse_iterator(cbegin()); }
