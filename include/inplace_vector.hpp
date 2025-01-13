@@ -27,8 +27,8 @@ For more information, please refer to <https://unlicense.org>
 // Original: https://github.com/TedLyngmo/inplace_vector
 
 // NOLINTNEXTLINE(llvm-header-guard)
-#ifndef IPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8
-#define IPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8
+#ifndef LYNIPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8
+#define LYNIPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8
 
 #include <algorithm>
 #include <array>
@@ -63,7 +63,7 @@ For more information, please refer to <https://unlicense.org>
 # else
 #  define LYNIPV_LAUNDER(x) x
 # endif
-#endif // LYNIPV_LAUNDER
+#endif
 
 namespace cpp26 {
 
@@ -74,11 +74,7 @@ template<typename U>
 struct is_nothrow_swappable : std::integral_constant<bool, noexcept(swap(std::declval<U&>(), std::declval<U&>()))> {};
 #endif
 
-#if __cplusplus >= 201703L
-using byte = std::byte;
-#else
-using byte = unsigned char;
-#endif
+enum class byte : unsigned char {};
 
 template<class T, std::size_t N>
 class inplace_vector {
