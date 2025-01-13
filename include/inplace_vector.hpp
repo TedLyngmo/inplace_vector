@@ -27,8 +27,8 @@ For more information, please refer to <https://unlicense.org>
 // Original: https://github.com/TedLyngmo/inplace_vector
 
 // NOLINTNEXTLINE(llvm-header-guard)
-#ifndef INPLACE_VECTOR_HPP_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8
-#define INPLACE_VECTOR_HPP_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8
+#ifndef IPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8
+#define IPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8
 
 #include <algorithm>
 #include <array>
@@ -41,13 +41,44 @@ For more information, please refer to <https://unlicense.org>
 #include <type_traits>
 #include <utility>
 
+#ifndef LYNIPV_CXX20_CONSTEXPR
 #if __cplusplus >= 202002L
-# define IPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8_CPP20CONSTEXPR constexpr
+# define LYNIPV_CXX20_CONSTEXPR constexpr
 #else
-# define IPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8_CPP20CONSTEXPR
+# define LYNIPV_CXX20_CONSTEXPR
+#endif
 #endif
 
+#ifndef LYNIPV_CXX14_CONSTEXPR
+#if __cplusplus >= 201402L
+#define LYNIPV_CXX14_CONSTEXPR constexpr
+#else
+#define LYNIPV_CXX14_CONSTEXPR
+#endif
+#endif
+
+#ifndef LYNIPV_LAUNDER
+#if __cplusplus >= 201703L
+#define LYNIPV_LAUNDER(x) std::launder( x )
+#else
+#define LYNIPV_LAUNDER(x) x
+#endif
+#endif // LYNIPV_LAUNDER
+
 namespace cpp26 {
+
+#if __cplusplus >= 201703L
+using std::is_nothrow_swappable;
+#else
+template<typename U>
+struct is_nothrow_swappable : std::integral_constant<bool, noexcept(swap(std::declval<U&>(), std::declval<U&>()))> {};
+#endif
+
+#if __cplusplus >= 201703L
+using byte = std::byte;
+#else
+using byte = unsigned char;
+#endif
 
 template<class T, std::size_t N>
 class inplace_vector {
@@ -66,18 +97,18 @@ public:
 
 private:
     struct alignas(T) aligned_storage {
-        constexpr reference ref() { return *std::launder(reinterpret_cast<pointer>(m_raw)); }
-        constexpr const_reference ref() const { return *std::launder(reinterpret_cast<const_pointer>(m_raw)); }
+        LYNIPV_CXX14_CONSTEXPR reference ref() { return *LYNIPV_LAUNDER(reinterpret_cast<pointer>(m_raw)); }
+        LYNIPV_CXX14_CONSTEXPR const_reference ref() const { return *LYNIPV_LAUNDER(reinterpret_cast<const_pointer>(m_raw)); }
 
         template<class... Args>
-        constexpr reference construct(Args&&... args) {
+        LYNIPV_CXX14_CONSTEXPR reference construct(Args&&... args) {
             return *::new(static_cast<void*>(m_raw)) T(std::forward<Args>(args)...);
         }
-        constexpr void destroy() { ref().~T(); }
-        std::byte m_raw[sizeof(T)];
+        LYNIPV_CXX14_CONSTEXPR void destroy() { ref().~T(); }
+        byte m_raw[sizeof(T)];
     };
 
-    constexpr void shrink_by(size_type count) noexcept {
+    LYNIPV_CXX14_CONSTEXPR void shrink_by(size_type count) noexcept {
         for(size_type idx = m_size - count; idx < m_size; ++idx) {
             m_data[idx].destroy();
         }
@@ -87,23 +118,23 @@ private:
 public:
     // constructors
     constexpr inplace_vector() noexcept = default;
-    constexpr explicit inplace_vector(size_type count) {
+    LYNIPV_CXX14_CONSTEXPR explicit inplace_vector(size_type count) {
         if(count > N) throw std::bad_alloc();
         while(count--) unchecked_emplace_back();
     }
-    constexpr inplace_vector(size_type count, const T& value) {
+    LYNIPV_CXX14_CONSTEXPR inplace_vector(size_type count, const T& value) {
         if(count > N) throw std::bad_alloc();
         while(count--) unchecked_push_back(value);
     }
     template<class InputIt>
-    constexpr inplace_vector(InputIt first, InputIt last) {
+    LYNIPV_CXX14_CONSTEXPR inplace_vector(InputIt first, InputIt last) {
         std::copy(first, last, std::back_inserter(*this));
     }
 
     // make copy/move use push_back_unchecked
     constexpr inplace_vector(const inplace_vector& other) : inplace_vector(other.begin(), other.end()) {}
 
-    constexpr inplace_vector(inplace_vector&& other) noexcept(N == 0 || std::is_nothrow_move_constructible_v<T>) {
+    LYNIPV_CXX14_CONSTEXPR inplace_vector(inplace_vector&& other) noexcept(N == 0 || std::is_nothrow_move_constructible<T>::value) {
         std::move(other.begin(), other.end(), std::back_inserter(*this));
     }
 
@@ -111,41 +142,41 @@ public:
     constexpr inplace_vector(std::initializer_list<T> init) : inplace_vector(init.begin(), init.end()) {}
 
     // destructor
-    IPV_F4BA9AA8_99CD_11EF_8916_90B11C0C0FF8_CPP20CONSTEXPR ~inplace_vector() noexcept { clear(); }
+    LYNIPV_CXX20_CONSTEXPR ~inplace_vector() noexcept { clear(); }
 
     // assignment
     constexpr inplace_vector& operator=(const inplace_vector& other) {
         assign(other.begin(), other.end());
         return *this;
     }
-    constexpr inplace_vector& operator=(inplace_vector&& other) noexcept(N == 0 || (std::is_nothrow_move_assignable_v<T> &&
-                                                                                    std::is_nothrow_move_constructible_v<T>)) {
+    LYNIPV_CXX14_CONSTEXPR inplace_vector& operator=(inplace_vector&& other) noexcept(N == 0 || (std::is_nothrow_move_assignable<T>::value &&
+                                                                                                 std::is_nothrow_move_constructible<T>::value)) {
         clear();
         std::move(other.begin(), other.end(), std::back_inserter(*this));
         return *this;
     }
-    constexpr inplace_vector& operator=(std::initializer_list<T> init) {
+    LYNIPV_CXX14_CONSTEXPR inplace_vector& operator=(std::initializer_list<T> init) {
         if(init.size() > capacity()) throw std::bad_alloc();
         assign(init.begin(), init.end());
         return *this;
     }
-    constexpr void assign(size_type count, const T& value) {
+    LYNIPV_CXX14_CONSTEXPR void assign(size_type count, const T& value) {
         if(count > capacity()) throw std::bad_alloc();
         clear();
-        while(count--) push_back_unchecked(value);
+        while(count--) push_back(value);
     }
     template<class InputIt>
-    constexpr void assign(InputIt first, InputIt last) {
+    LYNIPV_CXX14_CONSTEXPR void assign(InputIt first, InputIt last) {
         clear();
         std::copy(first, last, std::back_inserter(*this));
     }
-    constexpr void assign(std::initializer_list<T> ilist) {
+    LYNIPV_CXX14_CONSTEXPR void assign(std::initializer_list<T> ilist) {
         clear();
         std::copy(ilist.begin(), ilist.end(), std::back_inserter(*this));
     }
 
     // element access
-    constexpr reference at(size_type idx) {
+    LYNIPV_CXX14_CONSTEXPR reference at(size_type idx) {
         if(idx >= m_size) throw std::out_of_range("");
         return m_data[idx].ref();
     }
@@ -153,29 +184,29 @@ public:
         if(idx >= m_size) throw std::out_of_range("");
         return m_data[idx].ref();
     }
-    constexpr reference operator[](size_type idx) noexcept { return m_data[idx].ref(); }
+    LYNIPV_CXX14_CONSTEXPR reference operator[](size_type idx) noexcept { return m_data[idx].ref(); }
     constexpr const_reference operator[](size_type idx) const noexcept { return m_data[idx].ref(); }
-    constexpr reference front() { return m_data[0].ref(); }
+    LYNIPV_CXX14_CONSTEXPR reference front() { return m_data[0].ref(); }
     constexpr const_reference front() const { return m_data[0].ref(); }
-    constexpr reference back() { return m_data[m_size - 1].ref(); }
+    LYNIPV_CXX14_CONSTEXPR reference back() { return m_data[m_size - 1].ref(); }
     constexpr const_reference back() const { return m_data[m_size - 1].ref(); }
-    constexpr pointer data() noexcept { &m_data[0].ref(); }
-    constexpr const_pointer data() const noexcept { &m_data[0].ref(); }
+    LYNIPV_CXX14_CONSTEXPR pointer data() noexcept { &m_data[0].ref(); }
+    LYNIPV_CXX14_CONSTEXPR const_pointer data() const noexcept { &m_data[0].ref(); }
 
     // iterators
     constexpr const_iterator cbegin() const noexcept { return &m_data[0].ref(); }
     constexpr const_iterator cend() const noexcept { return &m_data[0].ref() + m_size; }
     constexpr const_iterator begin() const noexcept { return cbegin(); }
     constexpr const_iterator end() const noexcept { return cend(); }
-    constexpr iterator begin() noexcept { return &m_data[0].ref(); }
-    constexpr iterator end() noexcept { return &m_data[0].ref() + m_size; }
+    LYNIPV_CXX14_CONSTEXPR iterator begin() noexcept { return &m_data[0].ref(); }
+    LYNIPV_CXX14_CONSTEXPR iterator end() noexcept { return &m_data[0].ref() + m_size; }
 
     constexpr const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(cend()); }
     constexpr const_reverse_iterator crend() const noexcept { return const_reverse_iterator(cbegin()); }
     constexpr const_reverse_iterator rbegin() const noexcept { return crbegin(); }
     constexpr const_reverse_iterator rend() const noexcept { return crend(); }
-    constexpr reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
-    constexpr reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
+    LYNIPV_CXX14_CONSTEXPR reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
+    LYNIPV_CXX14_CONSTEXPR reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
 
     // size and capacity
     constexpr bool empty() const noexcept { return m_size == 0; }
@@ -184,7 +215,7 @@ public:
     static constexpr size_type capacity() noexcept { return N; }
 
 private:
-    constexpr void resize_unchecked(size_type count) {
+    LYNIPV_CXX14_CONSTEXPR void resize_unchecked(size_type count) {
         if(count < size()) {
             shrink_by(size() - count);
         } else {
@@ -194,7 +225,7 @@ private:
             }
         }
     }
-    constexpr void resize_unchecked(size_type count, const value_type& value) {
+    LYNIPV_CXX14_CONSTEXPR void resize_unchecked(size_type count, const value_type& value) {
         if(count < size()) {
             shrink_by(size() - count);
         } else {
@@ -206,18 +237,18 @@ private:
     }
 
 public:
-    constexpr void resize(size_type count) {
+    LYNIPV_CXX14_CONSTEXPR void resize(size_type count) {
         if(count > capacity()) throw std::bad_alloc();
         resize_unchecked(count);
     }
-    constexpr void resize(size_type count, const value_type& value) {
+    LYNIPV_CXX14_CONSTEXPR void resize(size_type count, const value_type& value) {
         if(count > capacity()) throw std::bad_alloc();
         resize_unchecked(count, value);
     }
-    static constexpr void reserve( size_type new_cap ) {
+    static LYNIPV_CXX14_CONSTEXPR void reserve( size_type new_cap ) {
         if(new_cap > capacity()) throw std::bad_alloc();
     }
-    static constexpr void shrink_to_fit() noexcept {
+    static LYNIPV_CXX14_CONSTEXPR void shrink_to_fit() noexcept {
     }
     
     // modifiers
@@ -232,40 +263,40 @@ public:
     constexpr iterator emplace( const_iterator position, Args&&... args );
     */
     template<class... Args>
-    constexpr reference unchecked_emplace_back(Args&&... args) {
+    LYNIPV_CXX14_CONSTEXPR reference unchecked_emplace_back(Args&&... args) {
         auto& rv = m_data[m_size].construct(std::forward<Args>(args)...);
         ++m_size;
         return rv;
     }
-    constexpr reference unchecked_push_back(T const& value) {
+    LYNIPV_CXX14_CONSTEXPR reference unchecked_push_back(T const& value) {
         auto& rv = m_data[m_size].construct(value);
         ++m_size;
         return rv;
     }
-    constexpr reference unchecked_push_back(T&& value) {
+    LYNIPV_CXX14_CONSTEXPR reference unchecked_push_back(T&& value) {
         auto& rv = m_data[m_size].construct(std::move(value));
         ++m_size;
         return rv;
     }
 
     template<class... Args>
-    constexpr reference emplace_back(Args&&... args) {
+    LYNIPV_CXX14_CONSTEXPR reference emplace_back(Args&&... args) {
         if(m_size == N) throw std::bad_alloc();
         return unchecked_emplace_back(std::forward<Args>(args)...);
     }
-    constexpr reference push_back(T const& value) {
+    LYNIPV_CXX14_CONSTEXPR reference push_back(T const& value) {
         if(m_size == N) throw std::bad_alloc();
         return unchecked_push_back(value);
     }
-    constexpr reference push_back(T&& value) {
+    LYNIPV_CXX14_CONSTEXPR reference push_back(T&& value) {
         if(m_size == N) throw std::bad_alloc();
         return unchecked_push_back(std::move(value));
     }
 
-    constexpr void pop_back() noexcept { shrink_by(1); }
-    constexpr void clear() noexcept { shrink_by(size()); }
+    LYNIPV_CXX14_CONSTEXPR void pop_back() noexcept { shrink_by(1); }
+    LYNIPV_CXX14_CONSTEXPR void clear() noexcept { shrink_by(size()); }
 
-    constexpr iterator erase(const_iterator first, const_iterator last) {
+    LYNIPV_CXX14_CONSTEXPR iterator erase(const_iterator first, const_iterator last) {
         auto ncfirst = const_cast<iterator>(first);
         auto nclast = const_cast<iterator>(last);
         auto removed = std::distance(ncfirst, nclast);
@@ -278,10 +309,12 @@ public:
     }
     constexpr iterator erase(const_iterator pos) { return erase(pos, std::next(pos)); }
 
-    constexpr void swap(inplace_vector& other) noexcept(N == 0 || (std::is_nothrow_swappable_v<T> &&
-                                                                   std::is_nothrow_move_constructible_v<T>)) {
-        auto&& [small, large] = (size() < other.size()) ? std::pair<inplace_vector&, inplace_vector&>(*this, other)
-                                                        : std::pair<inplace_vector&, inplace_vector&>(other, *this);
+    LYNIPV_CXX14_CONSTEXPR void swap(inplace_vector& other) noexcept(N == 0 || ( cpp26::is_nothrow_swappable<T>::value &&
+                                                                   std::is_nothrow_move_constructible<T>::value)) {
+        auto&& p = (size() < other.size()) ? std::pair<inplace_vector&, inplace_vector&>(*this, other)
+                                           : std::pair<inplace_vector&, inplace_vector&>(other, *this);
+        auto& small = p.first;
+        auto& large = p.second;
         size_type idx = 0, small_size = small.size();
         for(; idx < small_size; ++idx) {
             using std::swap;
@@ -292,9 +325,9 @@ public:
         }
         large.resize_unchecked(small_size);
     }
-    constexpr void friend swap(inplace_vector& lhs,
-                               inplace_vector& rhs) noexcept(N == 0 || (std::is_nothrow_swappable_v<T> &&
-                                                                        std::is_nothrow_move_constructible_v<T>)) {
+    LYNIPV_CXX14_CONSTEXPR void friend swap(inplace_vector& lhs,
+                               inplace_vector& rhs) noexcept(N == 0 || (cpp26::is_nothrow_swappable<T>::value &&
+                                                                        std::is_nothrow_move_constructible<T>::value)) {
         lhs.swap(rhs);
     }
 
