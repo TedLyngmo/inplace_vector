@@ -89,11 +89,11 @@ public:
     constexpr inplace_vector() noexcept = default;
     constexpr explicit inplace_vector(size_type count) {
         if(count > N) throw std::bad_alloc();
-        while(count--) emplace_back_unchecked();
+        while(count--) unchecked_emplace_back();
     }
     constexpr inplace_vector(size_type count, const T& value) {
         if(count > N) throw std::bad_alloc();
-        while(count--) push_back_unchecked(value);
+        while(count--) unchecked_push_back(value);
     }
     template<class InputIt>
     constexpr inplace_vector(InputIt first, InputIt last) {
@@ -132,7 +132,7 @@ public:
     constexpr void assign(size_type count, const T& value) {
         if(count > capacity()) throw std::bad_alloc();
         clear();
-        while(count--) push_back(value);
+        while(count--) push_back_unchecked(value);
     }
     template<class InputIt>
     constexpr void assign(InputIt first, InputIt last) {
@@ -144,7 +144,40 @@ public:
         std::copy(ilist.begin(), ilist.end(), std::back_inserter(*this));
     }
 
-    //
+    // element access
+    constexpr reference at(size_type idx) {
+        if(idx >= m_size) throw std::out_of_range("");
+        return m_data[idx].ref();
+    }
+    constexpr const_reference at(size_type idx) const {
+        if(idx >= m_size) throw std::out_of_range("");
+        return m_data[idx].ref();
+    }
+    constexpr reference operator[](size_type idx) noexcept { return m_data[idx].ref(); }
+    constexpr const_reference operator[](size_type idx) const noexcept { return m_data[idx].ref(); }
+    constexpr reference front() { return m_data[0].ref(); }
+    constexpr const_reference front() const { return m_data[0].ref(); }
+    constexpr reference back() { return m_data[m_size - 1].ref(); }
+    constexpr const_reference back() const { return m_data[m_size - 1].ref(); }
+    constexpr pointer data() noexcept { &m_data[0].ref(); }
+    constexpr const_pointer data() const noexcept { &m_data[0].ref(); }
+
+    // iterators
+    constexpr const_iterator cbegin() const noexcept { return &m_data[0].ref(); }
+    constexpr const_iterator cend() const noexcept { return &m_data[0].ref() + m_size; }
+    constexpr const_iterator begin() const noexcept { return cbegin(); }
+    constexpr const_iterator end() const noexcept { return cend(); }
+    constexpr iterator begin() noexcept { return &m_data[0].ref(); }
+    constexpr iterator end() noexcept { return &m_data[0].ref() + m_size; }
+
+    constexpr const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(cend()); }
+    constexpr const_reverse_iterator crend() const noexcept { return const_reverse_iterator(cbegin()); }
+    constexpr const_reverse_iterator rbegin() const noexcept { return crbegin(); }
+    constexpr const_reverse_iterator rend() const noexcept { return crend(); }
+    constexpr reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
+    constexpr reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
+
+    // size and capacity
     constexpr bool empty() const noexcept { return m_size == 0; }
     constexpr size_type size() const noexcept { return m_size; }
     static constexpr size_type max_size() noexcept { return N; }
@@ -157,7 +190,7 @@ private:
         } else {
             count -= size();
             while(count--) {
-                emplace_back_unchecked();
+                unchecked_emplace_back();
             }
         }
     }
@@ -181,52 +214,55 @@ public:
         if(count > capacity()) throw std::bad_alloc();
         resize_unchecked(count, value);
     }
-
-private:
+    static constexpr void reserve( size_type new_cap ) {
+        if(new_cap > capacity()) throw std::bad_alloc();
+    }
+    static constexpr void shrink_to_fit() noexcept {
+    }
+    
+    // modifiers
+    /* TODO
+    constexpr iterator insert( const_iterator pos, const T& value );
+    constexpr iterator insert( const_iterator pos, T&& value );
+    constexpr iterator insert( const_iterator pos, size_type count, const T& value );
+    template< class InputIt >
+    constexpr iterator insert( const_iterator pos, InputIt first, InputIt last );
+    constexpr iterator insert( const_iterator pos, std::initializer_list<T> ilist );
+    template< class... Args >
+    constexpr iterator emplace( const_iterator position, Args&&... args );
+    */
     template<class... Args>
-    constexpr reference emplace_back_unchecked(Args&&... args) {
+    constexpr reference unchecked_emplace_back(Args&&... args) {
         auto& rv = m_data[m_size].construct(std::forward<Args>(args)...);
         ++m_size;
         return rv;
     }
-    constexpr reference push_back_unchecked(T const& value) {
+    constexpr reference unchecked_push_back(T const& value) {
         auto& rv = m_data[m_size].construct(value);
         ++m_size;
         return rv;
     }
-    constexpr reference push_back_unchecked(T&& value) {
+    constexpr reference unchecked_push_back(T&& value) {
         auto& rv = m_data[m_size].construct(std::move(value));
         ++m_size;
         return rv;
     }
 
-public:
     template<class... Args>
     constexpr reference emplace_back(Args&&... args) {
         if(m_size == N) throw std::bad_alloc();
-        return emplace_back_unchecked(std::forward<Args>(args)...);
+        return unchecked_emplace_back(std::forward<Args>(args)...);
     }
     constexpr reference push_back(T const& value) {
         if(m_size == N) throw std::bad_alloc();
-        return push_back_unchecked(value);
+        return unchecked_push_back(value);
     }
     constexpr reference push_back(T&& value) {
         if(m_size == N) throw std::bad_alloc();
-        return push_back_unchecked(std::move(value));
-    }
-    constexpr reference operator[](size_type idx) noexcept { return m_data[idx].ref(); }
-    constexpr const_reference operator[](size_type idx) const noexcept { return m_data[idx].ref(); }
-    constexpr reference at(size_type idx) {
-        if(idx >= m_size) throw std::out_of_range("");
-        return m_data[idx].ref();
-    }
-    constexpr const_reference at(size_type idx) const {
-        if(idx >= m_size) throw std::out_of_range("");
-        return m_data[idx].ref();
+        return unchecked_push_back(std::move(value));
     }
 
     constexpr void pop_back() noexcept { shrink_by(1); }
-
     constexpr void clear() noexcept { shrink_by(size()); }
 
     constexpr iterator erase(const_iterator first, const_iterator last) {
@@ -261,25 +297,6 @@ public:
                                                                         std::is_nothrow_move_constructible_v<T>)) {
         lhs.swap(rhs);
     }
-
-    constexpr reference front() { return m_data[0].ref(); }
-    constexpr const_reference front() const { return m_data[0].ref(); }
-    constexpr reference back() { return m_data[m_size - 1].ref(); }
-    constexpr const_reference back() const { return m_data[m_size - 1].ref(); }
-
-    constexpr const_iterator cbegin() const noexcept { return &m_data[0].ref(); }
-    constexpr const_iterator cend() const noexcept { return &m_data[0].ref() + m_size; }
-    constexpr const_iterator begin() const noexcept { return cbegin(); }
-    constexpr const_iterator end() const noexcept { return cend(); }
-    constexpr iterator begin() noexcept { return &m_data[0].ref(); }
-    constexpr iterator end() noexcept { return &m_data[0].ref() + m_size; }
-
-    constexpr const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(cend()); }
-    constexpr const_reverse_iterator crend() const noexcept { return const_reverse_iterator(cbegin()); }
-    constexpr const_reverse_iterator rbegin() const noexcept { return crbegin(); }
-    constexpr const_reverse_iterator rend() const noexcept { return crend(); }
-    constexpr reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
-    constexpr reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
 
 private:
     std::array<aligned_storage, N> m_data;
