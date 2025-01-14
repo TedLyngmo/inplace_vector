@@ -211,7 +211,7 @@ public:
     static constexpr size_type capacity() noexcept { return N; }
 
 private:
-    LYNIPV_CXX14_CONSTEXPR void resize_unchecked(size_type count) {
+    LYNIPV_CXX14_CONSTEXPR void unchecked_resize(size_type count) {
         if(count < size()) {
             shrink_by(size() - count);
         } else {
@@ -221,7 +221,7 @@ private:
             }
         }
     }
-    LYNIPV_CXX14_CONSTEXPR void resize_unchecked(size_type count, const value_type& value) {
+    LYNIPV_CXX14_CONSTEXPR void unchecked_resize(size_type count, const value_type& value) {
         if(count < size()) {
             shrink_by(size() - count);
         } else {
@@ -235,11 +235,11 @@ private:
 public:
     LYNIPV_CXX14_CONSTEXPR void resize(size_type count) {
         if(count > capacity()) throw std::bad_alloc();
-        resize_unchecked(count);
+        unchecked_resize(count);
     }
     LYNIPV_CXX14_CONSTEXPR void resize(size_type count, const value_type& value) {
         if(count > capacity()) throw std::bad_alloc();
-        resize_unchecked(count, value);
+        unchecked_resize(count, value);
     }
     static LYNIPV_CXX14_CONSTEXPR void reserve(size_type new_cap) {
         if(new_cap > capacity()) throw std::bad_alloc();
@@ -247,15 +247,72 @@ public:
     static LYNIPV_CXX14_CONSTEXPR void shrink_to_fit() noexcept {}
 
     // modifiers
-    /* TODO
-    constexpr iterator insert( const_iterator pos, const T& value );
-    constexpr iterator insert( const_iterator pos, T&& value );
-    constexpr iterator insert( const_iterator pos, size_type count, const T& value );
-    template< class InputIt >
-    constexpr iterator insert( const_iterator pos, InputIt first, InputIt last );
-    constexpr iterator insert( const_iterator pos, std::initializer_list<T> ilist );
+private:
+    LYNIPV_CXX14_CONSTEXPR size_type make_room_at(const_iterator pos, size_type count) {
+        // optimization idea for all insert() functions to get away from constructing and rotating:
+        // create a gap by move constructing those after the new end.
+        // and move assign those that are before that.
+        // destroy those previously constructed
+        // This should leave a nice gap to construct the new range in.
+        // I don't know what to do about exception guarantees with that implementation though.
+        return {};
+    }
+
+public:
+    LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, const T& value) {
+        static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+        if(size() == capacity()) throw std::bad_alloc();
+        const auto ncpos = const_cast<iterator>(pos);
+        unchecked_emplace_back(value);
+        std::rotate(ncpos, std::prev(end()), end());
+        return ncpos;
+    }
+    LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, T&& value) {
+        static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+        if(size() == capacity()) throw std::bad_alloc();
+        const auto ncpos = const_cast<iterator>(pos);
+        unchecked_emplace_back(std::move(value));
+        std::rotate(ncpos, std::prev(end()), end());
+        return ncpos;
+    }
+    LYNIPV_CXX20_CONSTEXPR iterator insert(const_iterator pos, size_type count, const T& value) {
+        static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+        if(size() + count > capacity()) throw std::bad_alloc();
+        const auto ncpos = const_cast<iterator>(pos);
+        auto oldsize = size();
+        try {
+            while(count--) {
+                unchecked_emplace_back(value);
+            }
+        } catch(...) {
+            resize(oldsize);
+            throw;
+        }
+        std::rotate(ncpos, std::prev(end()), end());
+        return ncpos;
+    }
+    template<class InputIt>
+    LYNIPV_CXX20_CONSTEXPR iterator insert(const_iterator pos, InputIt first, InputIt last) {
+        static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+        const auto ncpos = const_cast<iterator>(pos);
+        auto oldsize = size();
+        try {
+            for(; first != last; ++first) {
+                unchecked_emplace_back(*first);
+            }
+        } catch(...) {
+            resize(oldsize);
+            throw;
+        }
+        std::rotate(ncpos, std::prev(end(), size() - oldsize), end());
+        return ncpos;
+    }
+    LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, std::initializer_list<T> ilist) {
+        return insert(pos, ilist.begin(), ilist.end());
+    }
+    /*
     template< class... Args >
-    constexpr iterator emplace( const_iterator position, Args&&... args );
+    LYNIPV_CXX14_CONSTEXPR iterator emplace( const_iterator position, Args&&... args );
     */
     template<class... Args>
     LYNIPV_CXX14_CONSTEXPR reference unchecked_emplace_back(Args&&... args) {
@@ -318,7 +375,7 @@ public:
         for(; idx < large.size(); ++idx) {
             small.push_back(std::move(large[idx]));
         }
-        large.resize_unchecked(small_size);
+        large.unchecked_resize(small_size);
     }
     LYNIPV_CXX14_CONSTEXPR void friend swap(inplace_vector& lhs, inplace_vector& rhs) noexcept(
         N == 0 || (cpp26::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value)) {
