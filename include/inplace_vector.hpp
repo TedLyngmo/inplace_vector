@@ -34,6 +34,7 @@ For more information, please refer to <https://unlicense.org>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <iterator>
 #include <new>
@@ -172,6 +173,18 @@ public:
         clear();
         std::copy(ilist.begin(), ilist.end(), std::back_inserter(*this));
     }
+    /*TODO:
+    template< container-compatible-range<T> R >
+    LYNIPV_CXX14_CONSTEXPR void assign_range( R&& rg );
+
+    template<container-compatible-range<T> R>
+    LYNIPV_CXX14_CONSTEXPR void append_range(R&& rg);
+
+#if __cplusplus >= 202002L
+    template <container-compatible-range<T> R>
+    constexpr ranges::borrowed_iterator_t<R> try_append_range(R&& rg);
+#endif
+    */
 
     // element access
     LYNIPV_CXX14_CONSTEXPR reference at(size_type idx) {
@@ -406,6 +419,26 @@ public:
     LYNIPV_CXX14_CONSTEXPR void friend swap(inplace_vector& lhs, inplace_vector& rhs) noexcept(
         N == 0 || (cpp26::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value)) {
         lhs.swap(rhs);
+    }
+
+#if __cplusplus >= 202002L
+    constexpr friend auto operator<=>(const inplace_vector& lhs, const inplace_vector& rhs) {
+        return std::lexicographical_compare_three_way(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
+    }
+#else
+    friend bool operator<(const inplace_vector& lhs, const inplace_vector& rhs) {
+        return std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
+    }
+    friend bool operator>(const inplace_vector& lhs, const inplace_vector& rhs) { return rhs < lhs; }
+    friend bool operator<=(const inplace_vector& lhs, const inplace_vector& rhs) {
+        return (lhs.empty() && rhs.empty()) || std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::less_equal<T>{});
+    }
+    friend bool operator>=(const inplace_vector& lhs, const inplace_vector& rhs) { return rhs <= lhs; }
+    friend bool operator!=(const inplace_vector& lhs, const inplace_vector& rhs) { return !(lhs == rhs); }
+#endif
+    friend bool operator==(const inplace_vector& lhs, const inplace_vector& rhs) {
+        if(lhs.size() != rhs.size()) return false;
+        return std::equal(lhs.cbegin(), lhs.cend(), rhs.cbegin());
     }
 
 private:

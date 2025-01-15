@@ -6,8 +6,22 @@
 
 #include "inplace_vector.hpp"
 int main() {
-    cpp26::inplace_vector<std::string, 4> iv;
-    cpp26::inplace_vector<std::string, 4> other;
+    using T = std::string;
+    using IVS = cpp26::inplace_vector<T, 4>;
+    IVS iv;
+    IVS other;
+    // validate General container requirements
+    static_assert(std::is_same<T, typename IVS::value_type>::value, "");
+    static_assert(std::is_same<T&, typename IVS::reference>::value, "");
+    static_assert(std::is_same<T const&, typename IVS::const_reference>::value, "");
+    static_assert(std::is_integral<typename IVS::difference_type>::value, "");
+    static_assert(std::is_signed<typename IVS::difference_type>::value, "");
+    static_assert(std::is_integral<typename IVS::size_type>::value, "");
+    static_assert(std::is_unsigned<typename IVS::size_type>::value, "");
+
+    // not a requirement, but validates that the iterators are there:
+    static_assert(std::is_same<T*, typename IVS::iterator>::value, "");
+    static_assert(std::is_same<T const*, typename IVS::const_iterator>::value, "");
 
     std::cout << "--- emplace 4 strings\n";
     {
@@ -86,5 +100,39 @@ int main() {
         assert(ex == true);
         assert(iv.try_push_back("nope") == nullptr);
         assert(iv.try_emplace_back("nope") == nullptr);
+    }
+    std::cout << "--- comparisons\n";
+    {
+        iv.clear();
+        other.clear();
+
+        assert(iv == other);
+        assert(!(iv != other));
+        assert(!(iv < other));
+        assert(!(iv > other));
+        assert(iv <= other);
+        assert(iv >= other);
+
+        other.emplace_back("1");
+        assert(!(iv == other));
+        assert(iv != other);
+        assert(iv < other);
+        assert(!(iv > other));
+        assert(iv <= other);
+        assert(!(iv >= other));
+
+        iv.emplace_back("2");
+        assert(!(iv == other));
+        assert(iv != other);
+        assert(!(iv < other));
+        assert(iv > other);
+        assert(!(iv <= other));
+        assert(iv >= other);
+    }
+    {
+        // const access
+        [](const cpp26::inplace_vector<std::string, 4>& r) {
+            for(auto& _ : r) { (void)_; }
+        }(iv);
     }
 }
