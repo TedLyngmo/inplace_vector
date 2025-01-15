@@ -130,11 +130,17 @@ public:
         std::copy(first, last, std::back_inserter(*this));
     }
 
-    // make copy/move use push_back_unchecked
-    constexpr inplace_vector(const inplace_vector& other) : inplace_vector(other.begin(), other.end()) {}
+    LYNIPV_CXX14_CONSTEXPR inplace_vector(const inplace_vector& other) : m_size(other.size()) {
+        for(size_type idx = 0; idx != m_size; ++idx) {
+            m_data[idx].construct(other[idx]);
+        }
+    }
 
-    LYNIPV_CXX14_CONSTEXPR inplace_vector(inplace_vector&& other) noexcept(N == 0 || std::is_nothrow_move_constructible<T>::value) {
-        std::move(other.begin(), other.end(), std::back_inserter(*this));
+    LYNIPV_CXX14_CONSTEXPR inplace_vector(inplace_vector&& other) noexcept(N == 0 || std::is_nothrow_move_constructible<T>::value) :
+        m_size(other.size()) {
+        for(size_type idx = 0; idx != m_size; ++idx) {
+            m_data[idx].construct(std::move(other[idx]));
+        }
     }
 
     // this needs to use the checked version though
@@ -431,7 +437,8 @@ public:
     }
     friend bool operator>(const inplace_vector& lhs, const inplace_vector& rhs) { return rhs < lhs; }
     friend bool operator<=(const inplace_vector& lhs, const inplace_vector& rhs) {
-        return (lhs.empty() && rhs.empty()) || std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::less_equal<T>{});
+        return (lhs.empty() && rhs.empty()) ||
+               std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::less_equal<T>{});
     }
     friend bool operator>=(const inplace_vector& lhs, const inplace_vector& rhs) { return rhs <= lhs; }
     friend bool operator!=(const inplace_vector& lhs, const inplace_vector& rhs) { return !(lhs == rhs); }
