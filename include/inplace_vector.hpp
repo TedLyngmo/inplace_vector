@@ -186,8 +186,8 @@ public:
     constexpr const_reference front() const { return m_data[0].ref(); }
     LYNIPV_CXX14_CONSTEXPR reference back() { return m_data[m_size - 1].ref(); }
     constexpr const_reference back() const { return m_data[m_size - 1].ref(); }
-    LYNIPV_CXX14_CONSTEXPR pointer data() noexcept { return &m_data[0].ref(); }
-    LYNIPV_CXX14_CONSTEXPR const_pointer data() const noexcept { return &m_data[0].ref(); }
+    LYNIPV_CXX14_CONSTEXPR pointer data() noexcept { return std::addressof(m_data[0].ref()); }
+    LYNIPV_CXX14_CONSTEXPR const_pointer data() const noexcept { return std::addressof(m_data[0].ref()); }
 
     // iterators
     constexpr const_iterator cbegin() const noexcept { return data(); }
