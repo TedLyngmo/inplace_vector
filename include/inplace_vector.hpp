@@ -250,9 +250,9 @@ public:
 private:
     LYNIPV_CXX14_CONSTEXPR size_type make_room_at(const_iterator pos, size_type count) {
         // optimization idea for all insert() functions to get away from constructing and rotating:
-        // create a gap by move constructing those after the new end.
-        // and move assign those that are before that.
-        // destroy those previously constructed
+        // create a gap by move constructing count T's after end.
+        // move assign size()-count-distance(begin(),pos) T' that are before that.
+        // ... and destroy the old host for those move assigned.
         // This should leave a nice gap to construct the new range in.
         // I don't know what to do about exception guarantees with that implementation though.
         return {};
@@ -285,7 +285,7 @@ public:
                 unchecked_emplace_back(value);
             }
         } catch(...) {
-            resize(oldsize);
+            unchecked_resize(oldsize);
             throw;
         }
         std::rotate(ncpos, std::prev(end()), end());
@@ -301,7 +301,7 @@ public:
                 unchecked_emplace_back(*first);
             }
         } catch(...) {
-            resize(oldsize);
+            unchecked_resize(oldsize);
             throw;
         }
         std::rotate(ncpos, std::prev(end(), size() - oldsize), end());
