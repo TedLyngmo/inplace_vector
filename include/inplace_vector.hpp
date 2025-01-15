@@ -81,7 +81,6 @@ class inplace_vector {
 public:
     using value_type = T;
     using size_type = std::size_t;
-    using difference_type = std::ptrdiff_t;
     using reference = T&;
     using const_reference = T const&;
     using pointer = T*;
@@ -90,6 +89,7 @@ public:
     using const_iterator = T const*;
     using reverse_iterator = std::reverse_iterator<iterator>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+    using difference_type = typename std::iterator_traits<iterator>::difference_type;
 
 private:
     struct alignas(T) aligned_storage {
@@ -303,14 +303,14 @@ public:
         const auto ncpos = const_cast<iterator>(pos);
         auto oldsize = size();
         try {
-            for(; first != last; ++first) {
+            for(; first != last; std::advance(first, 1)) {
                 unchecked_emplace_back(*first);
             }
         } catch(...) {
             unchecked_resize(oldsize);
             throw;
         }
-        std::rotate(ncpos, std::prev(end(), size() - oldsize), end());
+        std::rotate(ncpos, std::prev(end(), static_cast<difference_type>(size() - oldsize)), end());
         return ncpos;
     }
     LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, std::initializer_list<T> ilist) {
@@ -377,7 +377,7 @@ public:
     LYNIPV_CXX14_CONSTEXPR iterator erase(const_iterator first, const_iterator last) {
         auto ncfirst = const_cast<iterator>(first);
         auto nclast = const_cast<iterator>(last);
-        auto removed = std::distance(ncfirst, nclast);
+        auto removed = static_cast<std::size_t>(std::distance(ncfirst, nclast));
         std::move(nclast, end(), ncfirst);
         for(size_type idx = m_size - removed; idx < m_size; ++idx) {
             m_data[idx].destroy();

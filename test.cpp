@@ -24,7 +24,7 @@ int main() {
     }
     std::cout << "--- erase two in the middle\n";
     {
-        auto it = iv.erase(iv.cbegin() + 1, iv.cbegin() + 3);
+        auto it = iv.erase(std::next(iv.cbegin()), std::next(iv.cbegin(),3));
         assert(iv.size() == 2);
         std::cout << *it << '\n';
         std::swap(iv, other);
@@ -50,7 +50,7 @@ int main() {
         assert(iv.empty());
         iv.insert(iv.begin(), 3, "Here be three copies of the same string inserted");
         auto& teststr = "And one inserted second";
-        auto it = iv.insert(iv.begin() + 1, 1, teststr);
+        auto it = iv.insert(std::next(iv.begin()), 1, teststr);
         assert(*it == teststr);
         for(auto& str : iv) std::cout << str << '\n';
     }
@@ -60,7 +60,7 @@ int main() {
         assert(iv.size() == 2);
         std::string two[]{"2. Now \"Here be three copies...\" is first and \"And one inserted second\" last",
                           "3. And I am the third string"};
-        auto it = iv.insert(iv.begin() + 1, std::begin(two), std::end(two));
+        auto it = iv.insert(std::next(iv.begin()), std::begin(two), std::end(two));
         for(auto& str : iv) std::cout << str << '\n';
         assert(iv.size() == 4);
         assert(*it == two[0]);
@@ -71,7 +71,7 @@ int main() {
         iv.erase(std::prev(iv.end()));
         iv.erase(iv.begin());
         assert(iv.size() == 2);
-        iv.insert(iv.begin() + 1, {"2.3 - I am the second string", "2.7 - and I amd the third string, the fourth one is lying"});
+        iv.insert(std::next(iv.begin()), {"2.3 - I am the second string", "2.7 - and I amd the third string, the fourth one is lying"});
         assert(iv.size() == 4);
         for(auto& str : iv) std::cout << str << '\n';
     }
