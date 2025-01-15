@@ -167,7 +167,7 @@ public:
     LYNIPV_CXX14_CONSTEXPR void assign(size_type count, const T& value) {
         if(count > capacity()) throw std::bad_alloc();
         clear();
-        while(count--) push_back(value);
+        while(count != size()) push_back(value);
     }
     template<class InputIt>
     LYNIPV_CXX14_CONSTEXPR void assign(InputIt first, InputIt last) {
@@ -175,6 +175,7 @@ public:
         std::copy(first, last, std::back_inserter(*this));
     }
     LYNIPV_CXX14_CONSTEXPR void assign(std::initializer_list<T> ilist) {
+        if(ilist.size() > capacity()) throw std::bad_alloc();
         clear();
         std::copy(ilist.begin(), ilist.end(), std::back_inserter(*this));
     }
