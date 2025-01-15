@@ -118,11 +118,11 @@ public:
     constexpr inplace_vector() noexcept = default;
     LYNIPV_CXX14_CONSTEXPR explicit inplace_vector(size_type count) {
         if(count > N) throw std::bad_alloc();
-        while(count--) unchecked_emplace_back();
+        while(count != size()) unchecked_emplace_back();
     }
     LYNIPV_CXX14_CONSTEXPR inplace_vector(size_type count, const T& value) {
         if(count > N) throw std::bad_alloc();
-        while(count--) unchecked_push_back(value);
+        while(count != size()) unchecked_push_back(value);
     }
     template<class InputIt>
     LYNIPV_CXX14_CONSTEXPR inplace_vector(InputIt first, InputIt last) {
