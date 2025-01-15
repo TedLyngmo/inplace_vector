@@ -107,11 +107,10 @@ private:
         byte m_raw[sizeof(T)];
     };
 
-    LYNIPV_CXX14_CONSTEXPR void shrink_by(size_type count) noexcept {
-        for(size_type idx = m_size - count; idx < m_size; ++idx) {
-            m_data[idx].destroy();
+    LYNIPV_CXX14_CONSTEXPR void shrink_to(const size_type count) noexcept {
+        while(count != size()) {
+            pop_back();
         }
-        m_size -= count;
     }
 
 public:
@@ -234,20 +233,18 @@ public:
 private:
     LYNIPV_CXX14_CONSTEXPR void unchecked_resize(size_type count) {
         if(count < size()) {
-            shrink_by(size() - count);
+            shrink_to(count);
         } else {
-            count -= size();
-            while(count--) {
+            while(count != size()) {
                 unchecked_emplace_back();
             }
         }
     }
     LYNIPV_CXX14_CONSTEXPR void unchecked_resize(size_type count, const value_type& value) {
         if(count < size()) {
-            shrink_by(size() - count);
+            shrink_to(count);
         } else {
-            count -= size();
-            while(count--) {
+            while(count != size()) {
                 push_back_unchecked(value);
             }
         }
@@ -390,8 +387,8 @@ public:
         return std::addressof(unchecked_push_back(std::move(value)));
     }
 
-    LYNIPV_CXX14_CONSTEXPR void pop_back() noexcept { shrink_by(1); }
-    LYNIPV_CXX14_CONSTEXPR void clear() noexcept { shrink_by(size()); }
+    LYNIPV_CXX14_CONSTEXPR void pop_back() noexcept { m_data[--m_size].destroy(); }
+    LYNIPV_CXX14_CONSTEXPR void clear() noexcept { shrink_to(0); }
 
     LYNIPV_CXX14_CONSTEXPR iterator erase(const_iterator first, const_iterator last) {
         auto ncfirst = const_cast<iterator>(first);
