@@ -75,4 +75,16 @@ int main() {
         assert(iv.size() == 4);
         for(auto& str : iv) std::cout << str << '\n';
     }
+    {
+        bool ex = false;
+        try {
+            iv.emplace(iv.begin());
+        }
+        catch(const std::bad_alloc&) {
+            ex = true;
+        }
+        assert(ex == true);
+        assert(iv.try_push_back("nope") == nullptr);
+        assert(iv.try_emplace_back("nope") == nullptr);
+    }
 }

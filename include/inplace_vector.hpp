@@ -248,15 +248,19 @@ public:
 
     // modifiers
 private:
+    /*
+    // optimization idea for all insert() functions to get away from constructing and rotating:
     LYNIPV_CXX14_CONSTEXPR size_type make_room_at(const_iterator pos, size_type count) {
-        // optimization idea for all insert() functions to get away from constructing and rotating:
-        // create a gap by move constructing count T's after end.
-        // move assign size()-count-distance(begin(),pos) T' that are before that.
-        // ... and destroy the old host for those move assigned.
-        // This should leave a nice gap to construct the new range in.
-        // I don't know what to do about exception guarantees with that implementation though.
-        return {};
+        // - move construct some T's at current end().
+        // - move assign some T's before current end().
+        // - destroy the old host for those "moved from" but not "moved to".
+        //
+        // This should leave a nice gap to construct the new range in without the need for move assigning via rotate afterwards.
+        //
+        // I don't know what to do about exception guarantees with that implementation though so I'll leave it to something to think
+        // about.
     }
+    */
 
 public:
     LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, const T& value) {
@@ -310,10 +314,16 @@ public:
     LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, std::initializer_list<T> ilist) {
         return insert(pos, ilist.begin(), ilist.end());
     }
-    /*
-    template< class... Args >
-    LYNIPV_CXX14_CONSTEXPR iterator emplace( const_iterator position, Args&&... args );
-    */
+
+    template<class... Args>
+    LYNIPV_CXX14_CONSTEXPR iterator emplace(const_iterator pos, Args&&... args) {
+        static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+        const auto ncpos = const_cast<iterator>(pos);
+        emplace_back(std::forward<Args>(args)...);
+        std::rotate(ncpos, std::prev(end()), end());
+        return ncpos;
+    }
+
     template<class... Args>
     LYNIPV_CXX14_CONSTEXPR reference unchecked_emplace_back(Args&&... args) {
         auto& rv = m_data[m_size].construct(std::forward<Args>(args)...);
@@ -336,6 +346,12 @@ public:
         if(m_size == N) throw std::bad_alloc();
         return unchecked_emplace_back(std::forward<Args>(args)...);
     }
+    template<class... Args>
+    LYNIPV_CXX14_CONSTEXPR pointer try_emplace_back(Args&&... args) {
+        if(m_size == N) return nullptr;
+        return std::addressof(unchecked_emplace_back(std::forward<Args>(args)...));
+    }
+
     LYNIPV_CXX14_CONSTEXPR reference push_back(T const& value) {
         if(m_size == N) throw std::bad_alloc();
         return unchecked_push_back(value);
@@ -343,6 +359,14 @@ public:
     LYNIPV_CXX14_CONSTEXPR reference push_back(T&& value) {
         if(m_size == N) throw std::bad_alloc();
         return unchecked_push_back(std::move(value));
+    }
+    LYNIPV_CXX14_CONSTEXPR pointer try_push_back(T const& value) {
+        if(m_size == N) return nullptr;
+        return std::addressof(unchecked_push_back(value));
+    }
+    LYNIPV_CXX14_CONSTEXPR pointer try_push_back(T&& value) {
+        if(m_size == N) return nullptr;
+        return std::addressof(unchecked_push_back(std::move(value)));
     }
 
     LYNIPV_CXX14_CONSTEXPR void pop_back() noexcept { shrink_by(1); }
