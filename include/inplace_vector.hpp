@@ -93,8 +93,10 @@ public:
 
 private:
     struct alignas(T) aligned_storage {
-        LYNIPV_CXX14_CONSTEXPR reference ref() { return *LYNIPV_LAUNDER(reinterpret_cast<pointer>(m_raw)); }
-        LYNIPV_CXX14_CONSTEXPR const_reference ref() const { return *LYNIPV_LAUNDER(reinterpret_cast<const_pointer>(m_raw)); }
+        LYNIPV_CXX14_CONSTEXPR pointer ptr() { return LYNIPV_LAUNDER(reinterpret_cast<pointer>(m_raw)); }
+        LYNIPV_CXX14_CONSTEXPR const_pointer ptr() const { return LYNIPV_LAUNDER(reinterpret_cast<const_pointer>(m_raw)); }
+        LYNIPV_CXX14_CONSTEXPR reference ref() { return *ptr(); }
+        LYNIPV_CXX14_CONSTEXPR const_reference ref() const { return *ptr(); }
 
         template<class... Args>
         LYNIPV_CXX14_CONSTEXPR reference construct(Args&&... args) {
@@ -186,8 +188,8 @@ public:
     constexpr const_reference front() const { return m_data[0].ref(); }
     LYNIPV_CXX14_CONSTEXPR reference back() { return m_data[m_size - 1].ref(); }
     constexpr const_reference back() const { return m_data[m_size - 1].ref(); }
-    LYNIPV_CXX14_CONSTEXPR pointer data() noexcept { return std::addressof(m_data[0].ref()); }
-    LYNIPV_CXX14_CONSTEXPR const_pointer data() const noexcept { return std::addressof(m_data[0].ref()); }
+    LYNIPV_CXX14_CONSTEXPR pointer data() noexcept { return m_data[0].ptr(); }
+    LYNIPV_CXX14_CONSTEXPR const_pointer data() const noexcept { return m_data[0].ptr(); }
 
     // iterators
     constexpr const_iterator cbegin() const noexcept { return data(); }
