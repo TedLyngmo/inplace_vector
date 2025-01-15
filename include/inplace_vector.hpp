@@ -307,7 +307,7 @@ public:
                 unchecked_emplace_back(value);
             }
         } catch(...) {
-            unchecked_resize(oldsize);
+            shrink_to(oldsize);
             throw;
         }
         std::rotate(ncpos, std::prev(end()), end());
@@ -323,7 +323,7 @@ public:
                 unchecked_emplace_back(*first);
             }
         } catch(...) {
-            unchecked_resize(oldsize);
+            shrink_to(oldsize);
             throw;
         }
         std::rotate(ncpos, std::prev(end(), static_cast<difference_type>(size() - oldsize)), end());
@@ -417,7 +417,7 @@ public:
         for(; idx < large.size(); ++idx) {
             small.push_back(std::move(large[idx]));
         }
-        large.unchecked_resize(small_size);
+        large.shrink_to(small_size);
     }
     LYNIPV_CXX14_CONSTEXPR void friend swap(inplace_vector& lhs, inplace_vector& rhs) noexcept(
         N == 0 || (cpp26::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value)) {
