@@ -225,12 +225,39 @@ int main() {
             }
         }(iv);
     }
+
+#if __cplusplus >= 202002L
+    std::cout << "--- assign_range\n";
     {
+        std::vector<std::string> v1{"Hello", "world"};
+        cpp26::inplace_vector<std::string, 3> r1{"1", "2", "3"};
+        r1.assign_range(v1);
+        assert(std::equal(v1.begin(), v1.end(), r1.begin(), r1.end()));
+    }
+    std::cout << "--- append_range\n";
+    {
+        std::vector<std::string> v1{"Hello", "world"};
+        cpp26::inplace_vector<std::string, 3> r1;
+        r1.append_range(v1);
+        assert(std::equal(v1.begin(), v1.end(), r1.begin(), r1.end()));
+    }
+    std::cout << "--- try_append_range\n";
+    {
+        std::vector<std::string> v1{"Hello", "world", "now", "we", "will", "see"};
+        cpp26::inplace_vector<std::string, 2> r1;
+        auto it = r1.try_append_range(v1);
+        assert(*it == "now");
+        assert(std::equal(v1.begin(), std::next(v1.begin(), 2), r1.begin(), r1.end()));
+    }
+#endif
+
 #if __cplusplus >= 202302L
+    std::cout << "--- from_range\n";
+    {
         std::vector<std::string> v1{"Hello", "world"};
         cpp26::inplace_vector<std::string, 4> r1(std::from_range, v1);
         assert(std::equal(v1.begin(), v1.end(), r1.begin(), r1.end()));
-#endif
     }
+#endif
     return Fail;
 }
