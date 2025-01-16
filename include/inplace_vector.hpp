@@ -153,7 +153,7 @@ public:
 
     constexpr inplace_vector(std::initializer_list<T> init) : inplace_vector(init.begin(), init.end()) {}
 
-#if __cplusplus >= 202302L
+#if __cplusplus >= 202302L && defined(__cpp_lib_containers_ranges)
     template<detail::container_compatiblel_range<T> R>
     constexpr inplace_vector(std::from_range_t, R&& rg) {
         if constexpr(std::ranges::sized_range<R>) {

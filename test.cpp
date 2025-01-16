@@ -251,7 +251,7 @@ int main() {
     }
 #endif
 
-#if __cplusplus >= 202302L
+#if __cplusplus >= 202302L && defined(__cpp_lib_containers_ranges)
     std::cout << "--- from_range\n";
     {
         std::vector<std::string> v1{"Hello", "world"};
