@@ -34,15 +34,13 @@ bool Assert(T&& lhs, T&& rhs, int line, Cond cond, const char* condstr) {
     return false;
 }
 #define ASSERT_EQ(lhs, rhs) do { \
-    Fail = Assert(lhs, rhs, __LINE__, std::equal_to<decltype(lhs)>{}, "==") \
-        || Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l != r); }, "NOT !=") \
-        || Fail; } \
+    Fail = Assert(lhs, rhs, __LINE__, std::equal_to<decltype(lhs)>{}, "==") || Fail; \
+    Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l != r); }, "NOT !=") || Fail; } \
     while(false)
 
 #define ASSERT_NOT_EQ(lhs, rhs) do { \
-    Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return l != r; }, "!=") \
-        || Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l == r); }, "NOT ==") \
-        || Fail; } \
+    Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return l != r; }, "!=") || Fail; \
+    Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l == r); }, "NOT ==") || Fail; } \
     while(false)
 
 #define ASSERT_LT(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, std::less<decltype(lhs)>{}, "<") || Fail; } while(false)
@@ -198,6 +196,13 @@ int main() {
         [](const cpp26::inplace_vector<std::string, 4>& r) {
             for(auto& _ : r) { (void)_; }
         }(iv);
+    }
+    {
+#if __cplusplus >= 202302L
+    std::vector<std::string> v1{"Hello", "world"};
+    cpp26::inplace_vector<std::string, 4> r1(std::from_range, v1);
+    assert(std::equal(v1.begin(), v1.end(), r1.begin(), r1.end()));
+#endif
     }
     return Fail;
 }

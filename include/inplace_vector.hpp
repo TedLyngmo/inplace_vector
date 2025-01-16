@@ -38,6 +38,9 @@ For more information, please refer to <https://unlicense.org>
 #include <initializer_list>
 #include <iterator>
 #include <new>
+#if __cplusplus >= 202002L
+#include <ranges>
+#endif
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -67,6 +70,12 @@ For more information, please refer to <https://unlicense.org>
 #endif
 
 namespace cpp26 {
+namespace detail {
+#if __cplusplus >= 202002L
+template< class R, class T >
+concept container_compatiblel_range = std::ranges::input_range<R> && std::convertible_to<std::ranges::range_reference_t<R>, T>;
+#endif
+}
 
 #if __cplusplus >= 201703L
 using std::is_nothrow_swappable;
@@ -142,8 +151,15 @@ public:
         }
     }
 
-    // this needs to use the checked version though
     constexpr inplace_vector(std::initializer_list<T> init) : inplace_vector(init.begin(), init.end()) {}
+
+#if __cplusplus >= 202302L
+    template<detail::container_compatiblel_range<T> R>
+    constexpr inplace_vector(std::from_range_t, R&& rg) {
+        if(std::ranges::size(rg) > N) throw std::bad_alloc();
+        for(auto&& val : rg) unchecked_push_back(val);
+    }
+#endif
 
     // destructor
     LYNIPV_CXX20_CONSTEXPR ~inplace_vector() noexcept { clear(); }
