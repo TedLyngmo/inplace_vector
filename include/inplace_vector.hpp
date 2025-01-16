@@ -86,12 +86,12 @@ struct is_nothrow_swappable : std::integral_constant<bool, noexcept(swap(std::de
 namespace detail {
     template<class T, std::size_t N>
     struct aligned_storage {
-        using value_type = T;
+        using value_type = typename std::remove_const<T>::type;
         using size_type = std::size_t;
-        using reference = T&;
-        using const_reference = T const&;
-        using pointer = T*;
-        using const_pointer = T const*;
+        using reference = value_type&;
+        using const_reference = value_type const&;
+        using pointer = value_type*;
+        using const_pointer = value_type const*;
 
         LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type idx) { return &m_data[idx].data; }
         LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type idx) const { return &m_data[idx].data; }
@@ -115,7 +115,7 @@ namespace detail {
         union raw {
             LYNIPV_CXX20_CONSTEXPR ~raw() {}
             char dummy{};
-            T data;
+            value_type data;
         } m_data[N];
 
         size_type m_size = 0;
@@ -123,12 +123,12 @@ namespace detail {
 
     template<class T>
     struct aligned_storage<T, 0> { // specialization for 0 elements
-        using value_type = T;
+        using value_type = typename std::remove_const<T>::type;
         using size_type = std::size_t;
-        using reference = T&;
-        using const_reference = T const&;
-        using pointer = T*;
-        using const_pointer = T const*;
+        using reference = value_type&;
+        using const_reference = value_type const&;
+        using pointer = value_type*;
+        using const_pointer = value_type const*;
 
         LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type) { return nullptr; }
         LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type) const { return nullptr; }
@@ -369,7 +369,7 @@ private:
             shrink_to(count);
         } else {
             while(count != size()) {
-                push_back_unchecked(value);
+                unchecked_push_back(value);
             }
         }
     }
@@ -406,7 +406,7 @@ private:
 
 public:
     LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, const T& value) {
-        static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+        //static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
         if(size() == capacity()) throw std::bad_alloc();
         const auto ncpos = const_cast<iterator>(pos);
         unchecked_push_back(value);
@@ -414,7 +414,7 @@ public:
         return ncpos;
     }
     LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, T&& value) {
-        static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+        //static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
         if(size() == capacity()) throw std::bad_alloc();
         const auto ncpos = const_cast<iterator>(pos);
         unchecked_push_back(std::move(value));
@@ -422,7 +422,7 @@ public:
         return ncpos;
     }
     LYNIPV_CXX20_CONSTEXPR iterator insert(const_iterator pos, size_type count, const T& value) {
-        static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+        //static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
         if(size() + count > capacity()) throw std::bad_alloc();
         const auto ncpos = const_cast<iterator>(pos);
         auto oldsize = size();
