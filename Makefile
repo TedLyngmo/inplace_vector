@@ -28,8 +28,5 @@ cpp14: test.cpp include/inplace_vector.hpp Makefile
 cpp11: test.cpp include/inplace_vector.hpp Makefile
 	$(CXX) -std=c++11 -o $@ $< -Iinclude $(OPTS) -Werror -pedantic -g -fsanitize=address,undefined && ./$@
 
-cpp98: test.cpp include/inplace_vector.hpp Makefile
-	$(CXX) -std=c++98 -o $@ $< -Iinclude $(OPTS) -Werror -pedantic -g -fsanitize=address,undefined && ./$@
-
 clean:
 	rm -f cpp11 cpp14 cpp17 cpp20 cpp23 cpp26

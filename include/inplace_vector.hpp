@@ -267,14 +267,16 @@ public:
         while(count != size()) push_back(value);
     }
 
-    template<class InputIt, typename std::enable_if<
-                                std::is_constructible<typename std::iterator_traits<InputIt>::value_type>::value, int>::type = 0>
-    LYNIPV_CXX14_CONSTEXPR void assign(InputIt first, InputIt last) {
+    template<class InputIt>
+    LYNIPV_CXX14_CONSTEXPR auto assign(InputIt first, InputIt last) ->
+        typename std::enable_if<std::is_constructible<T, typename std::iterator_traits<InputIt>::value_type>::value>::type {
         clear();
         std::copy(first, last, std::back_inserter(*this));
     }
 
-    LYNIPV_CXX14_CONSTEXPR void assign(std::initializer_list<T> ilist) {
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto assign(std::initializer_list<T> ilist) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value>::type {
         if(ilist.size() > capacity()) throw std::bad_alloc();
         clear();
         std::copy(ilist.begin(), ilist.end(), std::back_inserter(*this));
@@ -355,7 +357,9 @@ public:
     static constexpr size_type capacity() noexcept { return N; }
 
 private:
-    LYNIPV_CXX14_CONSTEXPR void unchecked_resize(size_type count) {
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto unchecked_resize(size_type count) ->
+        typename std::enable_if<std::is_default_constructible<U>::value>::type {
         if(count < size()) {
             shrink_to(count);
         } else {
@@ -364,7 +368,10 @@ private:
             }
         }
     }
-    LYNIPV_CXX14_CONSTEXPR void unchecked_resize(size_type count, const value_type& value) {
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto unchecked_resize(size_type count, const value_type& value) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value>::type {
         if(count < size()) {
             shrink_to(count);
         } else {
@@ -375,14 +382,19 @@ private:
     }
 
 public:
-    LYNIPV_CXX14_CONSTEXPR void resize(size_type count) {
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto resize(size_type count) -> typename std::enable_if<std::is_default_constructible<U>::value>::type {
         if(count > capacity()) throw std::bad_alloc();
         unchecked_resize(count);
     }
-    LYNIPV_CXX14_CONSTEXPR void resize(size_type count, const value_type& value) {
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto resize(size_type count, const value_type& value) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value>::type {
         if(count > capacity()) throw std::bad_alloc();
         unchecked_resize(count, value);
     }
+
     static LYNIPV_CXX14_CONSTEXPR void reserve(size_type new_cap) {
         if(new_cap > capacity()) throw std::bad_alloc();
     }
@@ -405,24 +417,32 @@ private:
     */
 
 public:
-    LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, const T& value) {
-        //static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto insert(const_iterator pos, const T& value) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value, iterator>::type {
+        // static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
         if(size() == capacity()) throw std::bad_alloc();
         const auto ncpos = const_cast<iterator>(pos);
         unchecked_push_back(value);
         std::rotate(ncpos, std::prev(end()), end());
         return ncpos;
     }
-    LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, T&& value) {
-        //static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto insert(const_iterator pos, T&& value) ->
+        typename std::enable_if<std::is_move_constructible<U>::value, iterator>::type {
+        // static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
         if(size() == capacity()) throw std::bad_alloc();
         const auto ncpos = const_cast<iterator>(pos);
         unchecked_push_back(std::move(value));
         std::rotate(ncpos, std::prev(end()), end());
         return ncpos;
     }
-    LYNIPV_CXX20_CONSTEXPR iterator insert(const_iterator pos, size_type count, const T& value) {
-        //static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+
+    template<class U = T>
+    LYNIPV_CXX20_CONSTEXPR auto insert(const_iterator pos, size_type count, const T& value) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value, iterator>::type {
+        // static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
         if(size() + count > capacity()) throw std::bad_alloc();
         const auto ncpos = const_cast<iterator>(pos);
         auto oldsize = size();
@@ -438,10 +458,12 @@ public:
         std::rotate(ncpos, first_inserted, end());
         return ncpos;
     }
-    template<class InputIt, typename std::enable_if<
-                                std::is_constructible<typename std::iterator_traits<InputIt>::value_type>::value, int>::type = 0>
-    LYNIPV_CXX20_CONSTEXPR iterator insert(const_iterator pos, InputIt first, InputIt last) {
-        static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+    template<class InputIt, class U = T>
+    LYNIPV_CXX20_CONSTEXPR auto insert(const_iterator pos, InputIt first, InputIt last) ->
+        typename std::enable_if<std::is_constructible<typename std::iterator_traits<InputIt>::value_type>::value &&
+                                    !std::is_const<U>::value,
+                                iterator>::type {
+        // static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
         const auto ncpos = const_cast<iterator>(pos);
         auto oldsize = size();
         auto first_inserted = end();
@@ -456,13 +478,16 @@ public:
         std::rotate(ncpos, first_inserted, end());
         return ncpos;
     }
-    LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, std::initializer_list<T> ilist) {
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto insert(const_iterator pos, std::initializer_list<T> ilist) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value && !std::is_const<U>::value, iterator>::type {
         return insert(pos, ilist.begin(), ilist.end());
     }
 
     template<class... Args>
-    LYNIPV_CXX14_CONSTEXPR iterator emplace(const_iterator pos, Args&&... args) {
-        static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
+    LYNIPV_CXX14_CONSTEXPR auto emplace(const_iterator pos, Args&&... args) ->
+        typename std::enable_if<std::is_constructible<T, Args...>::value, iterator>::type {
+        // static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
         const auto ncpos = const_cast<iterator>(pos);
         emplace_back(std::forward<Args>(args)...);
         std::rotate(ncpos, std::prev(end()), end());
@@ -470,46 +495,67 @@ public:
     }
 
     template<class... Args>
-    LYNIPV_CXX14_CONSTEXPR reference unchecked_emplace_back(Args&&... args) {
+    LYNIPV_CXX14_CONSTEXPR auto unchecked_emplace_back(Args&&... args) ->
+        typename std::enable_if<std::is_constructible<T, Args...>::value, reference>::type {
         auto& rv = construct(size(), std::forward<Args>(args)...);
         this->inc();
         return rv;
     }
-    LYNIPV_CXX14_CONSTEXPR reference unchecked_push_back(T const& value) {
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto unchecked_push_back(T const& value) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value, reference>::type {
         auto& rv = construct(size(), value);
         this->inc();
         return rv;
     }
-    LYNIPV_CXX14_CONSTEXPR reference unchecked_push_back(T&& value) {
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto unchecked_push_back(T&& value) ->
+        typename std::enable_if<std::is_move_constructible<U>::value, reference>::type {
         auto& rv = construct(size(), std::move(value));
         this->inc();
         return rv;
     }
 
     template<class... Args>
-    LYNIPV_CXX14_CONSTEXPR reference emplace_back(Args&&... args) {
+    LYNIPV_CXX14_CONSTEXPR auto emplace_back(Args&&... args) ->
+        typename std::enable_if<std::is_constructible<T, Args...>::value, reference>::type {
         if(size() == N) throw std::bad_alloc();
         return unchecked_emplace_back(std::forward<Args>(args)...);
     }
+
     template<class... Args>
-    LYNIPV_CXX14_CONSTEXPR pointer try_emplace_back(Args&&... args) {
+    LYNIPV_CXX14_CONSTEXPR auto try_emplace_back(Args&&... args) ->
+        typename std::enable_if<std::is_constructible<T, Args...>::value, pointer>::type {
         if(size() == N) return nullptr;
         return std::addressof(unchecked_emplace_back(std::forward<Args>(args)...));
     }
 
-    LYNIPV_CXX14_CONSTEXPR reference push_back(T const& value) {
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto push_back(T const& value) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value, reference>::type {
         if(size() == N) throw std::bad_alloc();
         return unchecked_push_back(value);
     }
-    LYNIPV_CXX14_CONSTEXPR reference push_back(T&& value) {
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto push_back(T&& value) ->
+        typename std::enable_if<std::is_move_constructible<U>::value, reference>::type {
         if(size() == N) throw std::bad_alloc();
         return unchecked_push_back(std::move(value));
     }
-    LYNIPV_CXX14_CONSTEXPR pointer try_push_back(T const& value) {
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto try_push_back(T const& value) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value, pointer>::type {
         if(size() == N) return nullptr;
         return std::addressof(unchecked_push_back(value));
     }
-    LYNIPV_CXX14_CONSTEXPR pointer try_push_back(T&& value) {
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto try_push_back(T&& value) ->
+        typename std::enable_if<std::is_move_constructible<U>::value, pointer>::type {
         if(size() == N) return nullptr;
         return std::addressof(unchecked_push_back(std::move(value)));
     }
@@ -517,7 +563,9 @@ public:
     LYNIPV_CXX14_CONSTEXPR void pop_back() noexcept { destroy(this->dec()); }
     LYNIPV_CXX14_CONSTEXPR void clear() noexcept { shrink_to(0); }
 
-    LYNIPV_CXX14_CONSTEXPR iterator erase(const_iterator first, const_iterator last) {
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto erase(const_iterator first, const_iterator last) ->
+        typename std::enable_if<!std::is_const<U>::value, iterator>::type {
         auto ncfirst = const_cast<iterator>(first);
         auto nclast = const_cast<iterator>(last);
         auto removed = static_cast<std::size_t>(std::distance(ncfirst, nclast));
@@ -528,10 +576,16 @@ public:
         this->dec(removed);
         return ncfirst;
     }
-    LYNIPV_CXX14_CONSTEXPR iterator erase(const_iterator pos) { return erase(pos, std::next(pos)); }
 
-    LYNIPV_CXX14_CONSTEXPR void swap(inplace_vector& other) noexcept(N == 0 || (cpp26::is_nothrow_swappable<T>::value &&
-                                                                                std::is_nothrow_move_constructible<T>::value)) {
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto erase(const_iterator pos) -> typename std::enable_if<!std::is_const<U>::value, iterator>::type {
+        return erase(pos, std::next(pos));
+    }
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto swap(inplace_vector& other) noexcept(N == 0 || (cpp26::is_nothrow_swappable<T>::value &&
+                                                                                std::is_nothrow_move_constructible<T>::value)) ->
+        typename std::enable_if<!std::is_const<U>::value>::type {
         auto&& p = (size() < other.size()) ? std::pair<inplace_vector&, inplace_vector&>(*this, other)
                                            : std::pair<inplace_vector&, inplace_vector&>(other, *this);
         auto& small = p.first;
@@ -546,6 +600,7 @@ public:
         }
         large.shrink_to(small_size);
     }
+
     LYNIPV_CXX14_CONSTEXPR void friend swap(inplace_vector& lhs, inplace_vector& rhs) noexcept(
         N == 0 || (cpp26::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value)) {
         lhs.swap(rhs);

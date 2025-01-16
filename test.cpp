@@ -2,10 +2,30 @@
 
 #include <cassert>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <memory>
+
+// empty:
+/*
+template struct cpp26::inplace_vector<int, 0>;
+*/
+
+// trivial non-empty:
+template struct cpp26::inplace_vector<int, 1>;
+template struct cpp26::inplace_vector<int, 2>;
+template struct cpp26::inplace_vector<const int, 3>;
+
+// non-trivial
+template struct cpp26::inplace_vector<std::string, 3>;
+template struct cpp26::inplace_vector<const std::string, 3>;
+
+// move-only:
+/*
+template struct cpp26::inplace_vector<const std::unique_ptr<int>, 3>;
+template struct cpp26::inplace_vector<std::unique_ptr<int>, 3>;
+*/
 
 namespace {
 template<class T>
@@ -226,6 +246,7 @@ int main() {
             }
         }(iv);
     }
+    std::cout << "--- move only\n";
     {
         std::vector<std::unique_ptr<int>> vu;
         vu.emplace_back(new int{1});
@@ -236,6 +257,8 @@ int main() {
         assert(*mov[0] == 1);
         assert(*mov[1] == 2);
         assert(*mov[2] == 3);
+    }
+    {
     }
 
 #if __cplusplus >= 202002L
