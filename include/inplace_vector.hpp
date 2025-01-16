@@ -434,10 +434,7 @@ public:
         return std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
     }
     friend bool operator>(const inplace_vector& lhs, const inplace_vector& rhs) { return rhs < lhs; }
-    friend bool operator<=(const inplace_vector& lhs, const inplace_vector& rhs) {
-        return (lhs.empty() && rhs.empty()) ||
-               std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::less_equal<T>{});
-    }
+    friend bool operator<=(const inplace_vector& lhs, const inplace_vector& rhs) { return !(rhs < lhs); }
     friend bool operator>=(const inplace_vector& lhs, const inplace_vector& rhs) { return rhs <= lhs; }
     friend bool operator!=(const inplace_vector& lhs, const inplace_vector& rhs) { return !(lhs == rhs); }
 #endif

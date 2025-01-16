@@ -1,10 +1,62 @@
+#include "inplace_vector.hpp"
 
 #include <cassert>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
-#include "inplace_vector.hpp"
+namespace {
+template<class T>
+std::string str(T&& vec) {
+    std::ostringstream os;
+    os << '{';
+    if(not vec.empty()) {
+        auto it = std::begin(vec);
+        os << *it;
+        std::advance(it, 1);
+        for(auto end = std::end(vec); it != end; std::advance(it, 1)) {
+            os << ',' << *it;
+        }
+    }
+    os << '}';
+    return os.str();
+}
+bool Fail = false;
+}
+
+template<class T, class Cond>
+bool Assert(T&& lhs, T&& rhs, int line, Cond cond, const char* condstr) {
+    if(!cond(lhs, rhs)) {
+        std::cout << "FAIL @ line " << line << ": " << str(lhs) << ' ' << condstr << ' ' << str(rhs) << '\n';
+        return true;
+    }
+    return false;
+}
+#define ASSERT_EQ(lhs, rhs) do { \
+    Fail = Assert(lhs, rhs, __LINE__, std::equal_to<decltype(lhs)>{}, "==") \
+        || Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l != r); }, "NOT !=") \
+        || Fail; } \
+    while(false)
+
+#define ASSERT_NOT_EQ(lhs, rhs) do { \
+    Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return l != r; }, "!=") \
+        || Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l == r); }, "NOT ==") \
+        || Fail; } \
+    while(false)
+
+#define ASSERT_LT(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, std::less<decltype(lhs)>{}, "<") || Fail; } while(false)
+#define ASSERT_NOT_LT(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l < r); }, "NOT <") || Fail; } while(false)
+
+#define ASSERT_GT(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, std::greater<decltype(lhs)>{}, ">") || Fail; } while(false)
+#define ASSERT_NOT_GT(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l > r); }, "NOT >") || Fail; } while(false)
+
+#define ASSERT_LTEQ(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, std::less_equal<decltype(lhs)>{}, "<=") || Fail; } while(false)
+#define ASSERT_NOT_LTEQ(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l <= r); }, "NOT <=") || Fail; } while(false)
+
+#define ASSERT_GTEQ(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, std::greater_equal<decltype(lhs)>{}, ">=") || Fail; } while(false)
+#define ASSERT_NOT_GTEQ(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l >= r); }, "NOT >=") || Fail; } while(false)
+
 int main() {
     using T = std::string;
     using IVS = cpp26::inplace_vector<T, 4>;
@@ -106,28 +158,40 @@ int main() {
         iv.clear();
         other.clear();
 
-        assert(iv == other);
-        assert(!(iv != other));
-        assert(!(iv < other));
-        assert(!(iv > other));
-        assert(iv <= other);
-        assert(iv >= other);
+        ASSERT_EQ(iv, other);
+        ASSERT_NOT_LT(iv, other);
+        ASSERT_NOT_GT(iv, other);
+        ASSERT_LTEQ(iv,other);
+        ASSERT_GTEQ(iv, other);
 
         other.emplace_back("1");
-        assert(!(iv == other));
-        assert(iv != other);
-        assert(iv < other);
-        assert(!(iv > other));
-        assert(iv <= other);
-        assert(!(iv >= other));
+        ASSERT_NOT_EQ(iv, other);
+        ASSERT_LT(iv, other);
+        ASSERT_NOT_GT(iv, other);
+        ASSERT_LTEQ(iv, other);
+        ASSERT_NOT_GTEQ(iv, other);
 
         iv.emplace_back("2");
-        assert(!(iv == other));
-        assert(iv != other);
-        assert(!(iv < other));
-        assert(iv > other);
-        assert(!(iv <= other));
-        assert(iv >= other);
+        ASSERT_NOT_EQ(iv, other);
+        ASSERT_NOT_LT(iv, other);
+        ASSERT_GT(iv, other);
+        ASSERT_NOT_LTEQ(iv, other);
+        ASSERT_GTEQ(iv, other);
+
+        iv.pop_back();
+        iv.emplace_back("1");
+        ASSERT_EQ(iv, other);
+        ASSERT_NOT_LT(iv,other);
+        ASSERT_NOT_GT(iv, other);
+        ASSERT_LTEQ(iv, other);
+        ASSERT_GTEQ(iv, other);
+
+        other.emplace_back("2");
+        ASSERT_NOT_EQ(iv, other);
+        ASSERT_LT(iv, other);
+        ASSERT_NOT_GT(iv, other);
+        ASSERT_LTEQ(iv, other);
+        ASSERT_NOT_GTEQ(iv, other);
     }
     {
         // const access
@@ -135,4 +199,5 @@ int main() {
             for(auto& _ : r) { (void)_; }
         }(iv);
     }
+    return Fail;
 }
