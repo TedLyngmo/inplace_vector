@@ -37,6 +37,7 @@ For more information, please refer to <https://unlicense.org>
 #include <functional>
 #include <initializer_list>
 #include <iterator>
+#include <memory>
 #include <new>
 #if __cplusplus >= 202002L
 # include <ranges>
@@ -61,12 +62,10 @@ For more information, please refer to <https://unlicense.org>
 # endif
 #endif
 
-#ifndef LYNIPV_LAUNDER
-# if __cplusplus >= 201703L
-#  define LYNIPV_LAUNDER(x) std::launder(x)
-# else
-#  define LYNIPV_LAUNDER(x) x
-# endif
+#if __cplusplus >= 202002L
+# define LYNIPV_CONSTRUCT_AT(p, ...) std::construct_at(p __VA_OPT__(, ) __VA_ARGS__)
+#else
+# define LYNIPV_CONSTRUCT_AT(p, ...) ::new(static_cast<void*>(p)) T(__VA_ARGS__)
 #endif
 
 namespace cpp26 {
@@ -83,8 +82,6 @@ using std::is_nothrow_swappable;
 template<typename U>
 struct is_nothrow_swappable : std::integral_constant<bool, noexcept(swap(std::declval<U&>(), std::declval<U&>()))> {};
 #endif
-
-enum class byte : unsigned char {};
 
 template<class T, std::size_t N>
 class inplace_vector {
@@ -103,17 +100,22 @@ public:
 
 private:
     struct alignas(T) aligned_storage {
-        LYNIPV_CXX14_CONSTEXPR pointer ptr() { return LYNIPV_LAUNDER(reinterpret_cast<pointer>(m_raw)); }
-        LYNIPV_CXX14_CONSTEXPR const_pointer ptr() const { return LYNIPV_LAUNDER(reinterpret_cast<const_pointer>(m_raw)); }
-        LYNIPV_CXX14_CONSTEXPR reference ref() { return *ptr(); }
-        LYNIPV_CXX14_CONSTEXPR const_reference ref() const { return *ptr(); }
+        LYNIPV_CXX14_CONSTEXPR pointer ptr() { return &m_raw.data; }
+        LYNIPV_CXX14_CONSTEXPR const_pointer ptr() const { return &m_raw.data; }
+        LYNIPV_CXX14_CONSTEXPR reference ref() { return m_raw.data; }
+        LYNIPV_CXX14_CONSTEXPR const_reference ref() const { return m_raw.data; }
 
         template<class... Args>
-        LYNIPV_CXX14_CONSTEXPR reference construct(Args&&... args) {
-            return *::new(static_cast<void*>(m_raw)) T(std::forward<Args>(args)...);
+        LYNIPV_CXX20_CONSTEXPR reference construct(Args&&... args) {
+            return *LYNIPV_CONSTRUCT_AT(ptr(), std::forward<Args>(args)...);
         }
         LYNIPV_CXX14_CONSTEXPR void destroy() { ref().~T(); }
-        byte m_raw[sizeof(T)];
+
+        union raw {
+            ~raw() {}
+            char dummy{};
+            T data;
+        } m_raw;
     };
 
     LYNIPV_CXX14_CONSTEXPR void shrink_to(const size_type count) noexcept {
@@ -125,25 +127,33 @@ private:
 public:
     // constructors
     constexpr inplace_vector() noexcept = default;
+
+    template<bool D = std::is_default_constructible<T>::value, typename std::enable_if<D, int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR explicit inplace_vector(size_type count) {
         if(count > N) throw std::bad_alloc();
         while(count != size()) unchecked_emplace_back();
     }
+
+    template<bool C = std::is_copy_constructible<T>::value, typename std::enable_if<C, int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR inplace_vector(size_type count, const T& value) {
         if(count > N) throw std::bad_alloc();
         while(count != size()) unchecked_push_back(value);
     }
-    template<class InputIt>
+
+    template<class InputIt, typename std::enable_if<
+                                std::is_constructible<typename std::iterator_traits<InputIt>::value_type>::value, int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR inplace_vector(InputIt first, InputIt last) {
         std::copy(first, last, std::back_inserter(*this));
     }
 
+    template<class U = T, typename std::enable_if<std::is_copy_constructible<U>::value, int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR inplace_vector(const inplace_vector& other) : m_size(other.size()) {
         for(size_type idx = 0; idx != m_size; ++idx) {
             m_data[idx].construct(other[idx]);
         }
     }
 
+    template<class U = T, typename std::enable_if<std::is_move_constructible<U>::value, int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR inplace_vector(inplace_vector&& other) noexcept(N == 0 || std::is_nothrow_move_constructible<T>::value) :
         m_size(other.size()) {
         for(size_type idx = 0; idx != m_size; ++idx) {
@@ -151,6 +161,7 @@ public:
         }
     }
 
+    template<bool C = std::is_copy_constructible<T>::value, typename std::enable_if<C, int>::type = 0>
     constexpr inplace_vector(std::initializer_list<T> init) : inplace_vector(init.begin(), init.end()) {}
 
 #if __cplusplus >= 202302L && defined(__cpp_lib_containers_ranges)
@@ -169,31 +180,44 @@ public:
     LYNIPV_CXX20_CONSTEXPR ~inplace_vector() noexcept { clear(); }
 
     // assignment
-    LYNIPV_CXX14_CONSTEXPR inplace_vector& operator=(const inplace_vector& other) {
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto operator=(const inplace_vector& other) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value, inplace_vector&>::type {
         assign(other.begin(), other.end());
         return *this;
     }
-    LYNIPV_CXX14_CONSTEXPR inplace_vector& operator=(inplace_vector&& other) noexcept(
-        N == 0 || (std::is_nothrow_move_assignable<T>::value && std::is_nothrow_move_constructible<T>::value)) {
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto operator=(inplace_vector&& other) noexcept(N == 0 || (std::is_nothrow_move_assignable<T>::value &&
+                                                                                      std::is_nothrow_move_constructible<T>::value))
+        -> typename std::enable_if<std::is_move_constructible<U>::value, inplace_vector&>::type {
         clear();
         std::move(other.begin(), other.end(), std::back_inserter(*this));
         return *this;
     }
-    LYNIPV_CXX14_CONSTEXPR inplace_vector& operator=(std::initializer_list<T> init) {
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto operator=(std::initializer_list<T> init) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value, inplace_vector&>::type {
         if(init.size() > capacity()) throw std::bad_alloc();
         assign(init.begin(), init.end());
         return *this;
     }
-    LYNIPV_CXX14_CONSTEXPR void assign(size_type count, const T& value) {
+
+    template<class U = T>
+    LYNIPV_CXX14_CONSTEXPR auto assign(size_type count, const T& value) ->
+        typename std::enable_if<std::is_copy_constructible<U>::value>::type {
         if(count > capacity()) throw std::bad_alloc();
         clear();
         while(count != size()) push_back(value);
     }
+
     template<class InputIt>
     LYNIPV_CXX14_CONSTEXPR void assign(InputIt first, InputIt last) {
         clear();
         std::copy(first, last, std::back_inserter(*this));
     }
+
     LYNIPV_CXX14_CONSTEXPR void assign(std::initializer_list<T> ilist) {
         if(ilist.size() > capacity()) throw std::bad_alloc();
         clear();
@@ -497,4 +521,6 @@ private:
 };
 
 } // namespace cpp26
+
+#undef LYNIPV_CONSTRUCT_AT
 #endif

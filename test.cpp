@@ -5,6 +5,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace {
 template<class T>
@@ -225,8 +226,25 @@ int main() {
             }
         }(iv);
     }
+    {
+        std::vector<std::unique_ptr<int>> vu;
+        vu.emplace_back(new int);
+        vu.emplace_back(new int);
+        vu.emplace_back(new int);
+        cpp26::inplace_vector<std::unique_ptr<int>, 3> mov;
+        mov.assign(std::make_move_iterator(vu.begin()), std::make_move_iterator(vu.end()));
+    }
 
 #if __cplusplus >= 202002L
+    {
+        /*
+        constexpr cpp26::inplace_vector<int, 4> cxpr(1);
+        static_assert(cxpr.size() == 1);
+        static_assert(cxpr.back() == 0);
+        static_assert(cxpr.front() == 0);
+        static_assert(cxpr[0] == 0);
+        */
+    }
     std::cout << "--- assign_range\n";
     {
         std::vector<std::string> v1{"Hello", "world"};
