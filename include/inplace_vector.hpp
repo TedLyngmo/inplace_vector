@@ -156,8 +156,12 @@ public:
 #if __cplusplus >= 202302L
     template<detail::container_compatiblel_range<T> R>
     constexpr inplace_vector(std::from_range_t, R&& rg) {
-        if(std::ranges::size(rg) > N) throw std::bad_alloc();
-        for(auto&& val : rg) unchecked_push_back(val);
+        if constexpr(std::ranges::sized_range<R>) {
+            if(std::ranges::size(rg) > N) throw std::bad_alloc();
+            for(auto&& val : rg) unchecked_emplace_back(std::forward<decltype(val)>(val));
+        } else {
+            for(auto&& val : rg) emplace_back(std::forward<decltype(val)>(val));
+        }
     }
 #endif
 
@@ -195,18 +199,44 @@ public:
         clear();
         std::copy(ilist.begin(), ilist.end(), std::back_inserter(*this));
     }
-    /*TODO:
-    template< container-compatible-range<T> R >
-    LYNIPV_CXX14_CONSTEXPR void assign_range( R&& rg );
-
-    template<container-compatible-range<T> R>
-    LYNIPV_CXX14_CONSTEXPR void append_range(R&& rg);
 
 #if __cplusplus >= 202002L
-    template <container-compatible-range<T> R>
-    constexpr ranges::borrowed_iterator_t<R> try_append_range(R&& rg);
+    template<detail::container_compatiblel_range<T> R>
+    constexpr void assign_range(R&& rg)
+        requires std::constructible_from<T&, std::ranges::range_reference_t<R>>
+    {
+        clear();
+        append_range(std::forward<R>(rg));
+    }
+
+    template<detail::container_compatiblel_range<T> R>
+    constexpr void append_range(R&& rg)
+        requires std::constructible_from<T&, std::ranges::range_reference_t<R>>
+    {
+        if constexpr(std::ranges::sized_range<R>) {
+            if(size() + std::ranges::size(rg) > capacity()) throw std::bad_alloc();
+            for(auto&& val : rg) {
+                unchecked_emplace_back(std::forward<decltype(val)>(val));
+            }
+        } else {
+            for(auto&& val : rg) {
+                emplace_back(std::forward<decltype(val)>(val));
+            }
+        }
+    }
+
+    template<detail::container_compatiblel_range<T> R>
+    constexpr std::ranges::borrowed_iterator_t<R> try_append_range(R&& rg)
+        requires std::constructible_from<T&, std::ranges::range_reference_t<R>>
+    {
+        auto it = std::ranges::begin(rg);
+        for(auto end = std::ranges::end(rg); it != end; std::ranges::advance(it, 1)) {
+            if(size() == capacity()) break;
+            unchecked_emplace_back(*it);
+        }
+        return it;
+    }
 #endif
-    */
 
     // element access
     LYNIPV_CXX14_CONSTEXPR reference at(size_type idx) {
@@ -339,7 +369,7 @@ public:
         auto first_inserted = end();
         try {
             for(; first != last; std::advance(first, 1)) {
-                unchecked_push_back(*first);
+                push_back(*first);
             }
         } catch(...) {
             shrink_to(oldsize);
