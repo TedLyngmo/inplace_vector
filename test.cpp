@@ -23,7 +23,7 @@ std::string str(T&& vec) {
     return os.str();
 }
 bool Fail = false;
-}
+} // namespace
 
 template<class T, class Cond>
 bool Assert(T&& lhs, T&& rhs, int line, Cond cond, const char* condstr) {
@@ -33,27 +33,53 @@ bool Assert(T&& lhs, T&& rhs, int line, Cond cond, const char* condstr) {
     }
     return false;
 }
-#define ASSERT_EQ(lhs, rhs) do { \
-    Fail = Assert(lhs, rhs, __LINE__, std::equal_to<decltype(lhs)>{}, "==") || Fail; \
-    Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l != r); }, "NOT !=") || Fail; } \
-    while(false)
+#define ASSERT_EQ(lhs, rhs)                                                                                                \
+    do {                                                                                                                   \
+        Fail = Assert(lhs, rhs, __LINE__, std::equal_to<decltype(lhs)>{}, "==") || Fail;                                   \
+        Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r) { return !(l != r); }, "NOT !=") || Fail; \
+    } while(false)
 
-#define ASSERT_NOT_EQ(lhs, rhs) do { \
-    Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return l != r; }, "!=") || Fail; \
-    Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l == r); }, "NOT ==") || Fail; } \
-    while(false)
+#define ASSERT_NOT_EQ(lhs, rhs)                                                                                            \
+    do {                                                                                                                   \
+        Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r) { return l != r; }, "!=") || Fail;        \
+        Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r) { return !(l == r); }, "NOT ==") || Fail; \
+    } while(false)
 
-#define ASSERT_LT(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, std::less<decltype(lhs)>{}, "<") || Fail; } while(false)
-#define ASSERT_NOT_LT(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l < r); }, "NOT <") || Fail; } while(false)
+#define ASSERT_LT(lhs, rhs)                                                         \
+    do {                                                                            \
+        Fail = Assert(lhs, rhs, __LINE__, std::less<decltype(lhs)>{}, "<") || Fail; \
+    } while(false)
+#define ASSERT_NOT_LT(lhs, rhs)                                                                                          \
+    do {                                                                                                                 \
+        Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r) { return !(l < r); }, "NOT <") || Fail; \
+    } while(false)
 
-#define ASSERT_GT(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, std::greater<decltype(lhs)>{}, ">") || Fail; } while(false)
-#define ASSERT_NOT_GT(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l > r); }, "NOT >") || Fail; } while(false)
+#define ASSERT_GT(lhs, rhs)                                                            \
+    do {                                                                               \
+        Fail = Assert(lhs, rhs, __LINE__, std::greater<decltype(lhs)>{}, ">") || Fail; \
+    } while(false)
+#define ASSERT_NOT_GT(lhs, rhs)                                                                                          \
+    do {                                                                                                                 \
+        Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r) { return !(l > r); }, "NOT >") || Fail; \
+    } while(false)
 
-#define ASSERT_LTEQ(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, std::less_equal<decltype(lhs)>{}, "<=") || Fail; } while(false)
-#define ASSERT_NOT_LTEQ(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l <= r); }, "NOT <=") || Fail; } while(false)
+#define ASSERT_LTEQ(lhs, rhs)                                                              \
+    do {                                                                                   \
+        Fail = Assert(lhs, rhs, __LINE__, std::less_equal<decltype(lhs)>{}, "<=") || Fail; \
+    } while(false)
+#define ASSERT_NOT_LTEQ(lhs, rhs)                                                                                          \
+    do {                                                                                                                   \
+        Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r) { return !(l <= r); }, "NOT <=") || Fail; \
+    } while(false)
 
-#define ASSERT_GTEQ(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, std::greater_equal<decltype(lhs)>{}, ">=") || Fail; } while(false)
-#define ASSERT_NOT_GTEQ(lhs, rhs) do { Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r){ return !(l >= r); }, "NOT >=") || Fail; } while(false)
+#define ASSERT_GTEQ(lhs, rhs)                                                                 \
+    do {                                                                                      \
+        Fail = Assert(lhs, rhs, __LINE__, std::greater_equal<decltype(lhs)>{}, ">=") || Fail; \
+    } while(false)
+#define ASSERT_NOT_GTEQ(lhs, rhs)                                                                                          \
+    do {                                                                                                                   \
+        Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r) { return !(l >= r); }, "NOT >=") || Fail; \
+    } while(false)
 
 int main() {
     using T = std::string;
@@ -88,7 +114,7 @@ int main() {
     }
     std::cout << "--- erase two in the middle\n";
     {
-        auto it = iv.erase(std::next(iv.cbegin()), std::next(iv.cbegin(),3));
+        auto it = iv.erase(std::next(iv.cbegin()), std::next(iv.cbegin(), 3));
         assert(iv.size() == 2);
         std::cout << *it << '\n';
         std::swap(iv, other);
@@ -135,7 +161,8 @@ int main() {
         iv.erase(std::prev(iv.end()));
         iv.erase(iv.begin());
         assert(iv.size() == 2);
-        iv.insert(std::next(iv.begin()), {"2.3 - I am the second string", "2.7 - and I amd the third string, the fourth one is lying"});
+        iv.insert(std::next(iv.begin()),
+                  {"2.3 - I am the second string", "2.7 - and I amd the third string, the fourth one is lying"});
         assert(iv.size() == 4);
         for(auto& str : iv) std::cout << str << '\n';
     }
@@ -143,8 +170,7 @@ int main() {
         bool ex = false;
         try {
             iv.emplace(iv.begin());
-        }
-        catch(const std::bad_alloc&) {
+        } catch(const std::bad_alloc&) {
             ex = true;
         }
         assert(ex == true);
@@ -159,7 +185,7 @@ int main() {
         ASSERT_EQ(iv, other);
         ASSERT_NOT_LT(iv, other);
         ASSERT_NOT_GT(iv, other);
-        ASSERT_LTEQ(iv,other);
+        ASSERT_LTEQ(iv, other);
         ASSERT_GTEQ(iv, other);
 
         other.emplace_back("1");
@@ -179,7 +205,7 @@ int main() {
         iv.pop_back();
         iv.emplace_back("1");
         ASSERT_EQ(iv, other);
-        ASSERT_NOT_LT(iv,other);
+        ASSERT_NOT_LT(iv, other);
         ASSERT_NOT_GT(iv, other);
         ASSERT_LTEQ(iv, other);
         ASSERT_GTEQ(iv, other);
@@ -194,14 +220,16 @@ int main() {
     {
         // const access
         [](const cpp26::inplace_vector<std::string, 4>& r) {
-            for(auto& _ : r) { (void)_; }
+            for(auto& _ : r) {
+                (void)_;
+            }
         }(iv);
     }
     {
 #if __cplusplus >= 202302L
-    std::vector<std::string> v1{"Hello", "world"};
-    cpp26::inplace_vector<std::string, 4> r1(std::from_range, v1);
-    assert(std::equal(v1.begin(), v1.end(), r1.begin(), r1.end()));
+        std::vector<std::string> v1{"Hello", "world"};
+        cpp26::inplace_vector<std::string, 4> r1(std::from_range, v1);
+        assert(std::equal(v1.begin(), v1.end(), r1.begin(), r1.end()));
 #endif
     }
     return Fail;

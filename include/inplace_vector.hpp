@@ -39,7 +39,7 @@ For more information, please refer to <https://unlicense.org>
 #include <iterator>
 #include <new>
 #if __cplusplus >= 202002L
-#include <ranges>
+# include <ranges>
 #endif
 #include <stdexcept>
 #include <type_traits>
@@ -72,10 +72,10 @@ For more information, please refer to <https://unlicense.org>
 namespace cpp26 {
 namespace detail {
 #if __cplusplus >= 202002L
-template< class R, class T >
-concept container_compatiblel_range = std::ranges::input_range<R> && std::convertible_to<std::ranges::range_reference_t<R>, T>;
+    template<class R, class T>
+    concept container_compatiblel_range = std::ranges::input_range<R> && std::convertible_to<std::ranges::range_reference_t<R>, T>;
 #endif
-}
+} // namespace detail
 
 #if __cplusplus >= 201703L
 using std::is_nothrow_swappable;
@@ -293,7 +293,7 @@ private:
         // This should leave a nice gap to construct the new range in without the need for move assigning via rotate afterwards.
         //
         // I don't know what to do about exception guarantees with that implementation though so I'll leave it to something to think
-        // about.
+        // about. Perhaps it can be used for non-throwing constructors of T.
     }
     */
 
@@ -302,7 +302,7 @@ public:
         static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
         if(size() == capacity()) throw std::bad_alloc();
         const auto ncpos = const_cast<iterator>(pos);
-        unchecked_emplace_back(value);
+        unchecked_push_back(value);
         std::rotate(ncpos, std::prev(end()), end());
         return ncpos;
     }
@@ -310,7 +310,7 @@ public:
         static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
         if(size() == capacity()) throw std::bad_alloc();
         const auto ncpos = const_cast<iterator>(pos);
-        unchecked_emplace_back(std::move(value));
+        unchecked_push_back(std::move(value));
         std::rotate(ncpos, std::prev(end()), end());
         return ncpos;
     }
@@ -319,15 +319,16 @@ public:
         if(size() + count > capacity()) throw std::bad_alloc();
         const auto ncpos = const_cast<iterator>(pos);
         auto oldsize = size();
+        auto first_inserted = end();
         try {
             while(count--) {
-                unchecked_emplace_back(value);
+                unchecked_push_back(value);
             }
         } catch(...) {
             shrink_to(oldsize);
             throw;
         }
-        std::rotate(ncpos, std::prev(end()), end());
+        std::rotate(ncpos, first_inserted, end());
         return ncpos;
     }
     template<class InputIt>
@@ -335,15 +336,16 @@ public:
         static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
         const auto ncpos = const_cast<iterator>(pos);
         auto oldsize = size();
+        auto first_inserted = end();
         try {
             for(; first != last; std::advance(first, 1)) {
-                unchecked_emplace_back(*first);
+                unchecked_push_back(*first);
             }
         } catch(...) {
             shrink_to(oldsize);
             throw;
         }
-        std::rotate(ncpos, std::prev(end(), static_cast<difference_type>(size() - oldsize)), end());
+        std::rotate(ncpos, first_inserted, end());
         return ncpos;
     }
     LYNIPV_CXX14_CONSTEXPR iterator insert(const_iterator pos, std::initializer_list<T> ilist) {
