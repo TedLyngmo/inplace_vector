@@ -84,8 +84,18 @@ struct is_nothrow_swappable : std::integral_constant<bool, noexcept(swap(std::de
 #endif
 
 namespace detail {
+    template<class T>
+    union raw {
+        using value_type = typename std::remove_const<T>::type;
+        LYNIPV_CXX20_CONSTEXPR ~raw() {}
+        char dummy{};
+        value_type data;
+    };
+
     template<class T, std::size_t N>
     struct aligned_storage {
+        constexpr aligned_storage() noexcept {}
+
         using value_type = typename std::remove_const<T>::type;
         using size_type = std::size_t;
         using reference = value_type&;
@@ -93,33 +103,34 @@ namespace detail {
         using pointer = value_type*;
         using const_pointer = value_type const*;
 
-        LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type idx) { return &m_data[idx].data; }
-        LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type idx) const { return &m_data[idx].data; }
-        LYNIPV_CXX14_CONSTEXPR reference ref(size_type idx) { return m_data[idx].data; }
-        LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type idx) const { return m_data[idx].data; }
+        LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type idx) noexcept { return &m_data[idx].data; }
+        LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type idx) const noexcept { return &m_data[idx].data; }
+        LYNIPV_CXX14_CONSTEXPR reference ref(size_type idx) noexcept { return m_data[idx].data; }
+        LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type idx) const noexcept { return m_data[idx].data; }
 
         template<class... Args>
         LYNIPV_CXX20_CONSTEXPR reference construct(size_type idx, Args&&... args) {
             return *LYNIPV_CONSTRUCT_AT(ptr(idx), std::forward<Args>(args)...);
         }
-        LYNIPV_CXX14_CONSTEXPR void destroy(size_type idx) { ref(idx).~T(); }
+        LYNIPV_CXX14_CONSTEXPR void destroy(size_type idx) noexcept { ref(idx).~T(); }
 
-        LYNIPV_CXX14_CONSTEXPR reference operator[](size_type idx) { return ref(idx); }
-        constexpr const_reference operator[](size_type idx) const { return ref(idx); }
+        LYNIPV_CXX14_CONSTEXPR reference operator[](size_type idx) noexcept { return ref(idx); }
+        constexpr const_reference operator[](size_type idx) const noexcept { return ref(idx); }
 
         constexpr size_type size() const noexcept { return m_size; }
 
-        LYNIPV_CXX14_CONSTEXPR size_type inc() { return ++m_size; }
-        LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) { return m_size -= count; }
+        LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
+        LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
 
-        union raw {
-            LYNIPV_CXX20_CONSTEXPR ~raw() {}
-            char dummy{};
-            value_type data;
-        } m_data[N];
-
+        raw<T> m_data[N];
         size_type m_size = 0;
     };
+
+    template<class T>
+    raw<T>& dummy() { // ugly hack for 0-sized inline_vector... Fix later
+        static raw<T> instance;
+        return instance;
+    }
 
     template<class T>
     struct aligned_storage<T, 0> { // specialization for 0 elements
@@ -132,15 +143,17 @@ namespace detail {
 
         LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type) { return nullptr; }
         LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type) const { return nullptr; }
-        LYNIPV_CXX14_CONSTEXPR reference ref(size_type);
-        LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type) const;
+        LYNIPV_CXX14_CONSTEXPR reference ref(size_type) { return dummy<T>().data; }
+        LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type) const { return dummy<T>().data; }
 
         template<class... Args>
-        LYNIPV_CXX20_CONSTEXPR reference construct(size_type, Args&&...);
-        LYNIPV_CXX14_CONSTEXPR void destroy(size_type);
+        LYNIPV_CXX20_CONSTEXPR reference construct(size_type, Args&&...) {
+            return dummy<T>().data;
+        }
+        LYNIPV_CXX14_CONSTEXPR void destroy(size_type) {}
 
-        LYNIPV_CXX14_CONSTEXPR reference operator[](size_type);
-        constexpr const_reference operator[](size_type) const;
+        LYNIPV_CXX14_CONSTEXPR reference operator[](size_type) { return dummy<T>().data; }
+        constexpr const_reference operator[](size_type) const { return dummy<T>().data; }
 
         constexpr size_type size() const noexcept { return 0; }
 
@@ -329,10 +342,11 @@ public:
         if(idx >= size()) throw std::out_of_range("");
         return ref(idx);
     }
-    LYNIPV_CXX14_CONSTEXPR reference front() { return ref(0); }
-    constexpr const_reference front() const { return ref(0); }
-    LYNIPV_CXX14_CONSTEXPR reference back() { return ref(size() - 1); }
-    constexpr const_reference back() const { return ref(size() - 1); }
+    LYNIPV_CXX14_CONSTEXPR reference front() noexcept { return ref(0); }
+    constexpr const_reference front() const noexcept { return ref(0); }
+    LYNIPV_CXX14_CONSTEXPR reference back() noexcept { return ref(size() - 1); }
+    constexpr const_reference back() const noexcept { return ref(size() - 1); }
+
     LYNIPV_CXX14_CONSTEXPR pointer data() noexcept { return ptr(0); }
     LYNIPV_CXX14_CONSTEXPR const_pointer data() const noexcept { return ptr(0); }
 

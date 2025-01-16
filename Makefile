@@ -1,7 +1,7 @@
 ifeq (g++,$(CXX))
 OPTS=-Wall -Wextra -Wnrvo -fdiagnostics-all-candidates
 else ifeq (clang++,$(CXX))
-OPTS=-Weverything -fsafe-buffer-usage-suggestions -Wno-unsafe-buffer-usage -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-c++20-compat -Wno-missing-prototypes #-Wno-ctad-maybe-unsupported
+OPTS=-Weverything -fsafe-buffer-usage-suggestions -Wno-unsafe-buffer-usage -Wno-padded -Wno-exit-time-destructors -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-c++20-compat -Wno-missing-prototypes #-Wno-ctad-maybe-unsupported
 else
 OPTS=-Wall -Wextra
 endif

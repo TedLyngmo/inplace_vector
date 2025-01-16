@@ -8,23 +8,22 @@
 #include <vector>
 
 // empty:
-/*
-template struct cpp26::inplace_vector<int, 0>;
-*/
+
+template class cpp26::inplace_vector<int, 0>;
 
 // trivial non-empty:
-template struct cpp26::inplace_vector<int, 1>;
-template struct cpp26::inplace_vector<int, 2>;
-template struct cpp26::inplace_vector<const int, 3>;
+template class cpp26::inplace_vector<int, 1>;
+template class cpp26::inplace_vector<int, 2>;
+template class cpp26::inplace_vector<const int, 3>;
 
 // non-trivial
-template struct cpp26::inplace_vector<std::string, 3>;
-template struct cpp26::inplace_vector<const std::string, 3>;
+template class cpp26::inplace_vector<std::string, 3>;
+template class cpp26::inplace_vector<const std::string, 3>;
 
 // move-only:
 /*
-template struct cpp26::inplace_vector<const std::unique_ptr<int>, 3>;
-template struct cpp26::inplace_vector<std::unique_ptr<int>, 3>;
+template class cpp26::inplace_vector<const std::unique_ptr<int>, 3>;
+template class cpp26::inplace_vector<std::unique_ptr<int>, 3>;
 */
 
 namespace {
@@ -262,12 +261,25 @@ int main() {
     }
 
 #if __cplusplus >= 202002L
+    std::cout << "--- constexpr\n";
     {
         constexpr cpp26::inplace_vector<int, 4> cxpr(1);
         static_assert(cxpr.size() == 1);
         static_assert(cxpr.back() == 0);
         static_assert(cxpr.front() == 0);
         static_assert(cxpr[0] == 0);
+
+        static_assert([&]() constexpr -> bool {
+            using dt = decltype(cxpr)::difference_type;
+            bool fail = false;
+            for(std::size_t i = 0; i < cxpr.size(); ++i) { // contiguous
+                fail = (*std::next(cxpr.begin(), static_cast<dt>(i)) == *(std::addressof(*cxpr.begin()) + i)) || fail;
+                fail = (*std::next(cxpr.cbegin(), static_cast<dt>(i)) == *(std::addressof(*cxpr.cbegin()) + i)) || fail;
+                fail = (*std::next(cxpr.rbegin(), static_cast<dt>(i)) == *(std::addressof(*cxpr.rbegin()) - i)) || fail;
+                fail = (*std::next(cxpr.crbegin(), static_cast<dt>(i)) == *(std::addressof(*cxpr.crbegin()) - i)) || fail;
+            }
+            return fail;
+        }());
     }
     std::cout << "--- assign_range\n";
     {
