@@ -182,7 +182,7 @@ int main() {
         iv.erase(iv.begin());
         assert(iv.size() == 2);
         iv.insert(std::next(iv.begin()),
-                  {"2.3 - I am the second string", "2.7 - and I amd the third string, the fourth one is lying"});
+                  {"2.3 - I am the second string", "2.7 - and I am the third string, the fourth one is lying"});
         assert(iv.size() == 4);
         for(auto& str : iv) std::cout << str << '\n';
     }
@@ -272,11 +272,12 @@ int main() {
         static_assert([&]() constexpr -> bool {
             using dt = decltype(cxpr)::difference_type;
             bool fail = false;
-            for(std::size_t i = 0; i < cxpr.size(); ++i) { // contiguous
-                fail = (*std::next(cxpr.begin(), static_cast<dt>(i)) == *(std::addressof(*cxpr.begin()) + i)) || fail;
-                fail = (*std::next(cxpr.cbegin(), static_cast<dt>(i)) == *(std::addressof(*cxpr.cbegin()) + i)) || fail;
-                fail = (*std::next(cxpr.rbegin(), static_cast<dt>(i)) == *(std::addressof(*cxpr.rbegin()) - i)) || fail;
-                fail = (*std::next(cxpr.crbegin(), static_cast<dt>(i)) == *(std::addressof(*cxpr.crbegin()) - i)) || fail;
+            const auto s = static_cast<dt>(cxpr.size());
+            for(dt i = 0; i < s; ++i) {
+                fail = (*std::next(cxpr.begin(), i) == *(std::addressof(*cxpr.begin()) + i)) || fail;
+                fail = (*std::next(cxpr.cbegin(), i) == *(std::addressof(*cxpr.cbegin()) + i)) || fail;
+                fail = (*std::next(cxpr.rbegin(), i) == *(std::addressof(*cxpr.rbegin()) - i)) || fail;
+                fail = (*std::next(cxpr.crbegin(), i) == *(std::addressof(*cxpr.crbegin()) - i)) || fail;
             }
             return fail;
         }());

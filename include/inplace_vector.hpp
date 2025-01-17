@@ -46,25 +46,17 @@ For more information, please refer to <https://unlicense.org>
 #include <type_traits>
 #include <utility>
 
-#ifndef LYNIPV_CXX20_CONSTEXPR
-# if __cplusplus >= 202002L
-#  define LYNIPV_CXX20_CONSTEXPR constexpr
-# else
-#  define LYNIPV_CXX20_CONSTEXPR
-# endif
-#endif
-
-#ifndef LYNIPV_CXX14_CONSTEXPR
-# if __cplusplus >= 201402L
-#  define LYNIPV_CXX14_CONSTEXPR constexpr
-# else
-#  define LYNIPV_CXX14_CONSTEXPR
-# endif
+#if __cplusplus >= 201402L
+# define LYNIPV_CXX14_CONSTEXPR constexpr
+#else
+# define LYNIPV_CXX14_CONSTEXPR
 #endif
 
 #if __cplusplus >= 202002L
+# define LYNIPV_CXX20_CONSTEXPR constexpr
 # define LYNIPV_CONSTRUCT_AT(p, ...) std::construct_at(p __VA_OPT__(, ) __VA_ARGS__)
 #else
+# define LYNIPV_CXX20_CONSTEXPR
 # define LYNIPV_CONSTRUCT_AT(p, ...) ::new(static_cast<void*>(p)) T(__VA_ARGS__)
 #endif
 
@@ -155,13 +147,15 @@ namespace detail {
 
 template<class T, std::size_t N>
 class inplace_vector : detail::aligned_storage<T, N> {
+    static_assert(std::is_nothrow_destructible<T>::value,
+                  "inplace_vector: classes with potentially throwing destructors are prohibited");
     using base = detail::aligned_storage<T, N>;
-
-public:
     using base::construct;
     using base::destroy;
     using base::ptr;
     using base::ref;
+
+public:
     using base::size;
     using base::operator[];
 
@@ -417,7 +411,8 @@ private:
         // This should leave a nice gap to construct the new range in without the need for move assigning via rotate afterwards.
         //
         // I don't know what to do about exception guarantees with that implementation though so I'll leave it to something to think
-        // about. Perhaps it can be used for non-throwing constructors of T.
+        // about. Perhaps it can be used for T's with a non-throwing move assignment operator and move constructor.
+        // It will at least be ok for trivial types.
     }
     */
 
@@ -632,5 +627,9 @@ public:
 
 } // namespace cpp26
 
+// clean up defines
+#undef LYNIPV_CXX14_CONSTEXPR
+#undef LYNIPV_CXX20_CONSTEXPR
 #undef LYNIPV_CONSTRUCT_AT
+
 #endif
