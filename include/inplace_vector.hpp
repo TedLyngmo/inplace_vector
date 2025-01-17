@@ -84,14 +84,6 @@ struct is_nothrow_swappable : std::integral_constant<bool, noexcept(swap(std::de
 #endif
 
 namespace detail {
-    template<class T>
-    union raw {
-        using value_type = typename std::remove_const<T>::type;
-        LYNIPV_CXX20_CONSTEXPR ~raw() {}
-        char dummy{};
-        value_type data;
-    };
-
     template<class T, std::size_t N>
     struct aligned_storage {
         constexpr aligned_storage() noexcept {}
@@ -122,15 +114,14 @@ namespace detail {
         LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
         LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
 
-        raw<T> m_data[N];
+        union raw {
+            using value_type = typename std::remove_const<T>::type;
+            LYNIPV_CXX20_CONSTEXPR ~raw() {}
+            char dummy{};
+            value_type data;
+        } m_data[N];
         size_type m_size = 0;
     };
-
-    template<class T>
-    raw<T>& dummy() { // ugly hack for 0-sized inline_vector... Fix later
-        static raw<T> instance;
-        return instance;
-    }
 
     template<class T>
     struct aligned_storage<T, 0> { // specialization for 0 elements
@@ -143,17 +134,17 @@ namespace detail {
 
         LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type) { return nullptr; }
         LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type) const { return nullptr; }
-        LYNIPV_CXX14_CONSTEXPR reference ref(size_type) { return dummy<T>().data; }
-        LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type) const { return dummy<T>().data; }
+        LYNIPV_CXX14_CONSTEXPR reference ref(size_type) { return *ptr(0); }
+        LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type) const { return *ptr(0); }
 
         template<class... Args>
         LYNIPV_CXX20_CONSTEXPR reference construct(size_type, Args&&...) {
-            return dummy<T>().data;
+            return *ptr(0);
         }
         LYNIPV_CXX14_CONSTEXPR void destroy(size_type) {}
 
-        LYNIPV_CXX14_CONSTEXPR reference operator[](size_type) { return dummy<T>().data; }
-        constexpr const_reference operator[](size_type) const { return dummy<T>().data; }
+        LYNIPV_CXX14_CONSTEXPR reference operator[](size_type) { return *ptr(0); }
+        constexpr const_reference operator[](size_type) const { return *ptr(0); }
 
         constexpr size_type size() const noexcept { return 0; }
 
