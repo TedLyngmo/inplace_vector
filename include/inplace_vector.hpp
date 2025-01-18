@@ -61,21 +61,18 @@ For more information, please refer to <https://unlicense.org>
 #endif
 
 namespace cpp26 {
+
 namespace detail {
+#if __cplusplus >= 201703L
+    using std::is_nothrow_swappable;
+#else
+    template<typename U>
+    struct is_nothrow_swappable : std::integral_constant<bool, noexcept(swap(std::declval<U&>(), std::declval<U&>()))> {};
+#endif
 #if __cplusplus >= 202002L
     template<class R, class T>
     concept container_compatiblel_range = std::ranges::input_range<R> && std::convertible_to<std::ranges::range_reference_t<R>, T>;
 #endif
-} // namespace detail
-
-#if __cplusplus >= 201703L
-using std::is_nothrow_swappable;
-#else
-template<typename U>
-struct is_nothrow_swappable : std::integral_constant<bool, noexcept(swap(std::declval<U&>(), std::declval<U&>()))> {};
-#endif
-
-namespace detail {
     template<class T, std::size_t N>
     struct aligned_storage {
         constexpr aligned_storage() noexcept {}
@@ -583,7 +580,7 @@ public:
     }
 
     template<class U = T>
-    LYNIPV_CXX14_CONSTEXPR auto swap(inplace_vector& other) noexcept(N == 0 || (cpp26::is_nothrow_swappable<T>::value &&
+    LYNIPV_CXX14_CONSTEXPR auto swap(inplace_vector& other) noexcept(N == 0 || (detail::is_nothrow_swappable<T>::value &&
                                                                                 std::is_nothrow_move_constructible<T>::value)) ->
         typename std::enable_if<!std::is_const<U>::value>::type {
         auto&& p = (size() < other.size()) ? std::pair<inplace_vector&, inplace_vector&>(*this, other)
@@ -602,7 +599,7 @@ public:
     }
 
     LYNIPV_CXX14_CONSTEXPR void friend swap(inplace_vector& lhs, inplace_vector& rhs) noexcept(
-        N == 0 || (cpp26::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value)) {
+        N == 0 || (detail::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value)) {
         lhs.swap(rhs);
     }
 
