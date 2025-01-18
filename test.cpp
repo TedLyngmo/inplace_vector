@@ -101,6 +101,43 @@ bool Assert(T&& lhs, T&& rhs, int line, Cond cond, const char* condstr) {
         Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r) { return !(l >= r); }, "NOT >=") || Fail; \
     } while(false)
 
+#if __cplusplus >= 201402L
+namespace detail {
+template<class T, std::size_t... Is>
+constexpr cpp26::inplace_vector<T, sizeof...(Is)> make_inplace_vector_helper(std::index_sequence<Is...>) {
+    return cpp26::inplace_vector<T, sizeof...(Is)>{static_cast<T>(Is)...};
+}
+} // namespace detail
+template<class T, size_t N>
+constexpr cpp26::inplace_vector<T, N> make_inplace_vector() {
+    return detail::make_inplace_vector_helper<T>(std::make_index_sequence<N>{});
+}
+
+template<class T, size_t N>
+constexpr bool constexpr_test() {
+    bool fail = false;
+    for(unsigned i = 0; i < 10; ++i) {
+        const auto cxpr = make_inplace_vector<T, N>();
+        fail = (cxpr.size() != N) || fail;
+        if(N != 0) {
+            fail = (cxpr.front() != 0) || fail;
+            fail = (cxpr[0] != 0) || fail;
+            fail = (cxpr.back() != N - 1) || fail;
+            fail = (cxpr[N - 1] != N - 1) || fail;
+        } else {
+            fail = (sizeof cxpr != 1) || fail;
+        }
+
+        using st = typename decltype(cxpr)::size_type;
+        const auto s = cxpr.size();
+        for(st j = 0; j < s; ++j) {
+            fail = (cxpr[j] != j) || fail;
+        }
+    }
+    return not fail;
+}
+#endif
+
 int main() {
     using T = std::string;
     using IVS = cpp26::inplace_vector<T, 4>;
@@ -263,24 +300,10 @@ int main() {
 #if __cplusplus >= 202002L
     std::cout << "--- constexpr\n";
     {
-        constexpr cpp26::inplace_vector<int, 4> cxpr(1);
-        static_assert(cxpr.size() == 1);
-        static_assert(cxpr.back() == 0);
-        static_assert(cxpr.front() == 0);
-        static_assert(cxpr[0] == 0);
-
-        static_assert([&]() constexpr -> bool {
-            using dt = decltype(cxpr)::difference_type;
-            bool fail = false;
-            const auto s = static_cast<dt>(cxpr.size());
-            for(dt i = 0; i < s; ++i) {
-                fail = (*std::next(cxpr.begin(), i) == *(std::addressof(*cxpr.begin()) + i)) || fail;
-                fail = (*std::next(cxpr.cbegin(), i) == *(std::addressof(*cxpr.cbegin()) + i)) || fail;
-                fail = (*std::next(cxpr.rbegin(), i) == *(std::addressof(*cxpr.rbegin()) - i)) || fail;
-                fail = (*std::next(cxpr.crbegin(), i) == *(std::addressof(*cxpr.crbegin()) - i)) || fail;
-            }
-            return fail;
-        }());
+        static_assert(constexpr_test<unsigned, 0>());
+        static_assert(constexpr_test<unsigned, 1>());
+        static_assert(constexpr_test<unsigned, 2>());
+        static_assert(constexpr_test<unsigned, 3>());
     }
     std::cout << "--- assign_range\n";
     {

@@ -108,6 +108,7 @@ namespace detail {
             char dummy{};
             value_type data;
         } m_data[N];
+        static_assert(sizeof m_data == sizeof(T[N]), "erroneous size");
         size_type m_size = 0;
     };
 
