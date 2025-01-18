@@ -104,7 +104,6 @@ namespace detail {
         LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
 
         union raw {
-            using value_type = typename std::remove_const<T>::type;
             LYNIPV_CXX20_CONSTEXPR ~raw() {}
             char dummy{};
             value_type data;
