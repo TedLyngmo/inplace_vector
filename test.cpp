@@ -8,7 +8,6 @@
 #include <vector>
 
 // empty:
-
 template class cpp26::inplace_vector<int, 0>;
 
 // trivial non-empty:
@@ -21,14 +20,25 @@ template class cpp26::inplace_vector<std::string, 3>;
 template class cpp26::inplace_vector<const std::string, 3>;
 
 // move-only:
-/*
 template class cpp26::inplace_vector<const std::unique_ptr<int>, 3>;
 template class cpp26::inplace_vector<std::unique_ptr<int>, 3>;
-*/
+
+template<class...>
+struct is_inplace_vector : std::false_type {};
+template<class T, std::size_t N>
+struct is_inplace_vector<cpp26::inplace_vector<T, N>> : std::true_type {};
+
+static_assert(not is_inplace_vector<int>::value, "");
+static_assert(is_inplace_vector<cpp26::inplace_vector<int, 0>>::value, "");
 
 namespace {
 template<class T>
-std::string str(T&& vec) {
+auto str(T&& val) -> typename std::enable_if<not is_inplace_vector<typename std::remove_reference<T>::type>::value, T>::type {
+    return val;
+}
+
+template<class T, std::size_t N>
+std::string str(const cpp26::inplace_vector<T, N>& vec) {
     std::ostringstream os;
     os << '{';
     if(not vec.empty()) {
@@ -45,18 +55,28 @@ std::string str(T&& vec) {
 bool Fail = false;
 } // namespace
 
-template<class T, class Cond>
-bool Assert(T&& lhs, T&& rhs, int line, Cond cond, const char* condstr) {
+template<class L, class R, class Cond>
+bool Assert(L&& lhs, R&& rhs, int line, Cond cond, const char* condstr) {
     if(!cond(lhs, rhs)) {
         std::cout << "FAIL @ line " << line << ": " << str(lhs) << ' ' << condstr << ' ' << str(rhs) << '\n';
         return true;
     }
     return false;
 }
-#define ASSERT_EQ(lhs, rhs)                                                                                                \
-    do {                                                                                                                   \
-        Fail = Assert(lhs, rhs, __LINE__, std::equal_to<decltype(lhs)>{}, "==") || Fail;                                   \
-        Fail = Assert(lhs, rhs, __LINE__, [](decltype(lhs)& l, decltype(rhs)& r) { return !(l != r); }, "NOT !=") || Fail; \
+#define ASSERT_EQ(lhs, rhs)                                                                                \
+    do {                                                                                                   \
+        Fail = Assert(                                                                                     \
+                   lhs, rhs, __LINE__,                                                                     \
+                   [](typename std::remove_reference<decltype(lhs)>::type const& l,                        \
+                      typename std::remove_reference<decltype(rhs)>::type const& r) { return l == r; },    \
+                   "NOT !=") ||                                                                            \
+               Fail;                                                                                       \
+        Fail = Assert(                                                                                     \
+                   lhs, rhs, __LINE__,                                                                     \
+                   [](typename std::remove_reference<decltype(lhs)>::type const& l,                        \
+                      typename std::remove_reference<decltype(rhs)>::type const& r) { return !(l != r); }, \
+                   "NOT !=") ||                                                                            \
+               Fail;                                                                                       \
     } while(false)
 
 #define ASSERT_NOT_EQ(lhs, rhs)                                                                                            \
@@ -110,6 +130,8 @@ constexpr cpp26::inplace_vector<T, sizeof...(Is)> make_inplace_vector_helper(std
 } // namespace detail
 template<class T, size_t N>
 constexpr cpp26::inplace_vector<T, N> make_inplace_vector() {
+    static_assert(!std::is_trivially_copyable<T>::value || std::is_trivially_copyable<cpp26::inplace_vector<T, N>>::value || N == 0,
+                  "triviality failure");
     return detail::make_inplace_vector_helper<T>(std::make_index_sequence<N>{});
 }
 
@@ -294,7 +316,20 @@ int main() {
         assert(*mov[1] == 2);
         assert(*mov[2] == 3);
     }
+    std::cout << "--- trivial\n";
     {
+        cpp26::inplace_vector<int, 4> foo{1, 2, 3, 4};
+        auto bar = std::move(foo);
+        ASSERT_EQ(foo.size(), size_t{4});
+        ASSERT_EQ(foo[0], 1);
+        ASSERT_EQ(foo[1], 2);
+        ASSERT_EQ(foo[2], 3);
+        ASSERT_EQ(foo[3], 4);
+        ASSERT_EQ(bar.size(), size_t{4});
+        ASSERT_EQ(bar[0], 1);
+        ASSERT_EQ(bar[1], 2);
+        ASSERT_EQ(bar[2], 3);
+        ASSERT_EQ(bar[3], 4);
     }
 
 #if __cplusplus >= 202002L
