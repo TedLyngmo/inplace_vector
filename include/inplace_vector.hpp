@@ -109,6 +109,7 @@ namespace detail {
         LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
         LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
 
+    private:
         union raw {
             LYNIPV_CXX20_CONSTEXPR ~raw() {}
             char dummy{};
@@ -148,6 +149,7 @@ namespace detail {
         LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
         LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
 
+    private:
         union raw {
             char dummy{};
             value_type data;
@@ -688,6 +690,22 @@ public:
         return std::equal(lhs.cbegin(), lhs.cend(), rhs.cbegin());
     }
 };
+
+template<class T, size_t N, class U = T>
+LYNIPV_CXX14_CONSTEXPR typename inplace_vector<T, N>::size_type erase(inplace_vector<T, N>& c, const U& value) {
+    auto it = std::remove(c.begin(), c.end(), value);
+    auto r = static_cast<typename inplace_vector<T, N>::size_type>(std::distance(it, c.end()));
+    c.erase(it, it.end());
+    return r;
+}
+
+template<class T, size_t N, class Predicate>
+LYNIPV_CXX14_CONSTEXPR typename inplace_vector<T, N>::size_type erase_if(inplace_vector<T, N>& c, Predicate pred) {
+    auto it = std::remove_if(c.begin(), c.end(), pred);
+    auto r = static_cast<typename inplace_vector<T, N>::size_type>(std::distance(it, c.end()));
+    c.erase(it, c.end());
+    return r;
+}
 
 } // namespace cpp26
 
