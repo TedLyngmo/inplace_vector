@@ -90,8 +90,8 @@ namespace lyn_inplace_vector_detail {
         // destructor
         LYNIPV_CXX20_CONSTEXPR ~aligned_storage_non_trivial() noexcept { static_cast<inplace_vector<T, N>*>(this)->clear(); }
 
-        LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type idx) noexcept { return &m_data[idx].data; }
-        LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type idx) const noexcept { return &m_data[idx].data; }
+        LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type idx) noexcept { return std::addressof(m_data[idx].data); }
+        LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type idx) const noexcept { return std::addressof(m_data[idx].data); }
         LYNIPV_CXX14_CONSTEXPR reference ref(size_type idx) noexcept { return m_data[idx].data; }
         LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type idx) const noexcept { return m_data[idx].data; }
 
@@ -114,7 +114,8 @@ namespace lyn_inplace_vector_detail {
             LYNIPV_CXX20_CONSTEXPR ~raw() {}
             char dummy{};
             value_type data;
-        } m_data[N];
+        };
+        std::array<raw, N> m_data;
         static_assert(sizeof m_data == sizeof(T[N]), "erroneous size");
         size_type m_size = 0;
     };
@@ -131,8 +132,8 @@ namespace lyn_inplace_vector_detail {
         using pointer = value_type*;
         using const_pointer = value_type const*;
 
-        LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type idx) noexcept { return &m_data[idx].data; }
-        LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type idx) const noexcept { return &m_data[idx].data; }
+        LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type idx) noexcept { return std::addressof(m_data[idx].data); }
+        LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type idx) const noexcept { return std::addressof(m_data[idx].data); }
         LYNIPV_CXX14_CONSTEXPR reference ref(size_type idx) noexcept { return m_data[idx].data; }
         LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type idx) const noexcept { return m_data[idx].data; }
 
@@ -155,7 +156,8 @@ namespace lyn_inplace_vector_detail {
             constexpr raw() : dummy{} {}
             char dummy;
             value_type data;
-        } m_data[N];
+        };
+        std::array<raw, N> m_data;
         static_assert(sizeof m_data == sizeof(T[N]), "erroneous size");
         size_type m_size = 0;
     };
