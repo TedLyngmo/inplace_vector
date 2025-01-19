@@ -36,8 +36,13 @@ static_assert(is_inplace_vector<inplace_vector<int, 0>>::value, "");
 class NonDefaultConstructible {
 public:
     NonDefaultConstructible() = delete;
-    constexpr explicit NonDefaultConstructible(int) {}
+    constexpr explicit NonDefaultConstructible(int x) : m_x(x) {}
+
+private:
+    int m_x;
+    friend std::ostream& operator<<(std::ostream& os, const NonDefaultConstructible& nd) { return os << nd.m_x; }
 };
+
 static_assert(std::is_default_constructible<inplace_vector<NonDefaultConstructible, 2>>::value, "");
 
 namespace {
@@ -354,10 +359,19 @@ int main() {
         ASSERT_EQ(baz[2], 3);
         ASSERT_EQ(baz[3], 4);
     }
+    std::cout << "--- non-default constructible\n";
+    {
+        lyn::inplace_vector<NonDefaultConstructible, 4> iv2;
+        for(int i = 0; i < 4; ++i) {
+            iv2.emplace_back(i);
+        }
+        for(auto& v : iv2) std::cout << v << '\n';
+    }
 
 #if __cplusplus >= 202002L
     std::cout << "--- constexpr\n";
     {
+        static_assert(std::is_trivially_default_constructible<inplace_vector<unsigned, 0>>::value);
         static_assert(constexpr_test<unsigned, 0>());
         static_assert(constexpr_test<unsigned, 1>());
         static_assert(constexpr_test<unsigned, 2>());

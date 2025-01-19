@@ -152,7 +152,8 @@ namespace lyn_inplace_vector_detail {
 
     private:
         union raw {
-            char dummy{};
+            constexpr raw() : dummy{} {}
+            char dummy;
             value_type data;
         } m_data[N];
         static_assert(sizeof m_data == sizeof(T[N]), "erroneous size");
@@ -232,7 +233,7 @@ private:
 
 public:
     // constructors
-    constexpr inplace_vector() noexcept {}
+    constexpr inplace_vector() noexcept = default;
 
     template<bool D = std::is_default_constructible<T>::value, typename std::enable_if<D, int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR explicit inplace_vector(size_type count) {
