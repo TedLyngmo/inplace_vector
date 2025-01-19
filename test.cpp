@@ -1,11 +1,15 @@
-#include "inplace_vector.hpp"
-
 #include <cassert>
 #include <iostream>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#if __cplusplus >= 201703L
+#define LYNIPV_DEBUG
+#endif
+
+#include "inplace_vector.hpp"
 
 using namespace lyn;
 
@@ -49,6 +53,36 @@ namespace {
 template<class T>
 auto str(T&& val) -> typename std::enable_if<not is_inplace_vector<typename std::remove_reference<T>::type>::value, T>::type {
     return val;
+}
+
+template<class T>
+void validate() {
+    using namespace std;
+    using namespace lyn;
+    using IV = inplace_vector<T,1>;
+    std::ostringstream oss;
+    oss << std::boolalpha;
+    oss << __PRETTY_FUNCTION__ << '\n'
+        << " is_trivially_copyable              " << is_trivially_copyable<T>::value << '\n'
+        << " is_trivially_default_constructible " << is_trivially_default_constructible<T>::value << '\n'
+        << " usable in constant expressions     " << (is_trivially_copyable<T>::value && is_trivially_default_constructible<T>::value) << '\n' //
+        << '\n'
+        << " is_trivially_copy_constructible<T>                   " << is_trivially_copy_constructible<T>::value << '\n'
+        << " is_trivially_copy_constructible<inplace_vector<T,1>> " << is_trivially_copy_constructible<IV>::value << '\n' //
+        << '\n'
+        << " is_trivially_move_constructible<T>                   " << is_trivially_move_constructible<T>::value << '\n'
+        << " is_trivially_move_constructible<inplace_vector<T,1>> " << is_trivially_move_constructible<IV>::value << '\n' //
+        << '\n'
+        << " is_trivially_destructible<T>                         " << is_trivially_destructible<T>::value << '\n'
+        << " is_trivially_destructible<inplace_vector<T,1>>       " << is_trivially_destructible<IV>::value << '\n' //
+        << '\n'
+        << " is_trivially_copy_assignable<T>                      " << is_trivially_copy_assignable<T>::value << '\n'
+        << " is_trivially_copy_assignable<inplace_vector<T,1>>    " << is_trivially_copy_assignable<IV>::value << '\n' //
+        << '\n'
+        << " is_trivially_move_assignable<T>                      " << is_trivially_move_assignable<T>::value << '\n'
+        << " is_trivially_move_assignable<inplace_vector<T,1>>    " << is_trivially_move_assignable<IV>::value << '\n' //
+        ;
+    std::cout << oss.str();
 }
 
 template<class T, std::size_t N>
@@ -174,11 +208,34 @@ constexpr bool constexpr_test() {
 }
 #endif
 
+struct trivially_copy_constructible {
+    trivially_copy_constructible() = delete;
+    trivially_copy_constructible(const trivially_copy_constructible&) = default;
+    trivially_copy_constructible(trivially_copy_constructible&&) noexcept = delete;
+    trivially_copy_constructible& operator=(const trivially_copy_constructible&) = delete;
+    trivially_copy_constructible& operator=(trivially_copy_constructible&&) noexcept = delete;
+    ~trivially_copy_constructible() = default;
+};
+struct trivially_move_constructible {
+    trivially_move_constructible() = delete;
+    trivially_move_constructible(const trivially_move_constructible&) = delete;
+    trivially_move_constructible(trivially_move_constructible&&) noexcept = default;
+    trivially_move_constructible& operator=(const trivially_move_constructible&) = delete;
+    trivially_move_constructible& operator=(trivially_move_constructible&&) noexcept = delete;
+    ~trivially_move_constructible() = default;
+};
+
 int main() {
+    validate<int>();
+    validate<std::string>();
+    validate<trivially_copy_constructible>();
+    validate<trivially_move_constructible>();
     using T = std::string;
     using IVS = inplace_vector<T, 4>;
     IVS iv;
     IVS other;
+    static_assert(not std::is_trivially_copyable<T>::value, "");
+    static_assert(not std::is_trivially_copyable<IVS>::value, "");
     // validate General container requirements
     static_assert(std::is_same<T, typename IVS::value_type>::value, "");
     static_assert(std::is_same<T&, typename IVS::reference>::value, "");
@@ -205,6 +262,24 @@ int main() {
     {
         for(auto it = iv.crbegin(); it != iv.crend(); ++it) std::cout << *it << "\n";
     }
+    std::cout << "--- manual swap\n";
+    {
+        std::cout << " tmp <- iv" << std::endl;
+        IVS tmp(std::move(iv));
+        std::cout << " iv <- other" << std::endl;
+        iv = std::move(other);
+        std::cout << " other <- tmp" << std::endl;
+        other = std::move(tmp);
+        std::cout << " done" << std::endl;
+        assert(iv.size() == 0);
+        assert(other.size() == 4);
+    }
+    std::cout << "--- std::swap\n";
+    {
+        std::swap(iv, other);
+        assert(iv.size() == 4);
+        assert(other.size() == 0);
+    }
     std::cout << "--- erase two in the middle\n";
     {
         auto it = iv.erase(std::next(iv.cbegin()), std::next(iv.cbegin(), 3));
@@ -213,7 +288,9 @@ int main() {
         std::swap(iv, other);
         assert(iv.size() == 0);
         assert(other.size() == 2);
-        for(auto& str : other) std::cout << str << '\n';
+        for(std::string& str : other) {
+            std::cout << str << '\n';
+        }
     }
     std::cout << "--- with one added at end:\n";
     {
@@ -340,6 +417,7 @@ int main() {
     std::cout << "--- trivial\n";
     {
         inplace_vector<int, 4> foo{1, 2, 3, 4};
+        static_assert(std::is_trivially_copyable<typename std::remove_reference<decltype(foo)>::type>::value, "");
         auto bar = std::move(foo);
         ASSERT_EQ(foo.size(), size_t{4});
         ASSERT_EQ(foo[0], 1);
@@ -361,11 +439,13 @@ int main() {
     }
     std::cout << "--- non-default constructible\n";
     {
-        lyn::inplace_vector<NonDefaultConstructible, 4> iv2;
+        inplace_vector<NonDefaultConstructible, 4> foo;
+        // TODO: Fix so this passes?
+        //static_assert(std::is_trivially_copyable<typename std::remove_reference<decltype(foo)>::type>::value, "");
         for(int i = 0; i < 4; ++i) {
-            iv2.emplace_back(i);
+            foo.emplace_back(i);
         }
-        for(auto& v : iv2) std::cout << v << '\n';
+        for(auto& v : foo) std::cout << v << '\n';
     }
 
 #if __cplusplus >= 202002L

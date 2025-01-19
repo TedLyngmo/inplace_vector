@@ -66,6 +66,27 @@ namespace lyn {
 template<class, std::size_t>
 class inplace_vector;
 namespace lyn_inplace_vector_detail {
+#ifdef LYNIPV_DEBUG
+    template<class T>
+    struct LynIpvDebug {
+        template<class... Args>
+        std::string cre(Args&&... args) {
+            std::ostringstream oss;
+            (..., (oss << ' ' << std::forward<Args>(args)));
+            return oss.str();
+        }
+        template<class... Args>
+        LynIpvDebug(Args&&... args) : m_debug(cre(std::forward<Args>(args)...)) {
+            std::cout << "ENTER:" << m_debug << '\n';
+        }
+        ~LynIpvDebug() { std::cout << "EXIT: " << m_debug << '\n'; }
+        std::string m_debug;
+    };
+# define TRACE_ENTER(...) lyn::lyn_inplace_vector_detail::LynIpvDebug<T> kdhfgkljshdfgkljsdflgkh(__VA_ARGS__)
+#else
+# define TRACE_ENTER(...)
+#endif
+
 #if __cplusplus >= 201703L
     using std::is_nothrow_swappable;
 #else
@@ -258,10 +279,10 @@ public:
     LYNIPV_CXX14_CONSTEXPR inplace_vector(const inplace_vector& other) = default; // for trivial types
 
     template<class U = T,
-             typename std::enable_if<std::is_copy_constructible<U>::value &&
-                                         not std::is_trivially_copy_constructible<typename std::remove_reference<T>::type>::value,
+             typename std::enable_if<std::is_copy_constructible<U>::value && not std::is_trivially_copy_constructible<U>::value,
                                      int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR inplace_vector(const inplace_vector& other) {
+        TRACE_ENTER("inplace_vector(const inplace_vector& other)");
         for(size_type idx = 0; idx != other.size(); ++idx) {
             unchecked_push_back(other[idx]);
         }
@@ -270,10 +291,10 @@ public:
     LYNIPV_CXX14_CONSTEXPR inplace_vector(inplace_vector&& other) noexcept = default; // for trivial types
 
     template<class U = T,
-             typename std::enable_if<std::is_move_constructible<U>::value &&
-                                         not std::is_trivially_move_constructible<typename std::remove_reference<T>::type>::value,
+             typename std::enable_if<std::is_move_constructible<U>::value && not std::is_trivially_move_constructible<U>::value,
                                      int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR inplace_vector(inplace_vector&& other) noexcept(N == 0 || std::is_nothrow_move_constructible<T>::value) {
+        TRACE_ENTER("inplace_vector(inplace_vector&& other)");
         for(size_type idx = 0; idx != other.size(); ++idx) {
             unchecked_push_back(std::move(other[idx]));
         }
@@ -303,6 +324,7 @@ public:
         typename std::enable_if<not(std::is_trivially_destructible<U>::value && std::is_trivially_copy_constructible<U>::value &&
                                     std::is_trivially_copy_assignable<U>::value),
                                 inplace_vector&>::type {
+        TRACE_ENTER("operator=(const inplace_vector& other)");
         assign(other.begin(), other.end());
         return *this;
     }
@@ -317,6 +339,7 @@ public:
         typename std::enable_if<not(std::is_trivially_destructible<U>::value && std::is_trivially_move_constructible<U>::value &&
                                     std::is_trivially_move_assignable<U>::value),
                                 inplace_vector&>::type {
+        TRACE_ENTER("operator=(inplace_vector&& other)");
         clear();
         std::move(other.begin(), other.end(), std::back_inserter(*this));
         other.clear();
