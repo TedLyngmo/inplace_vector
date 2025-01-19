@@ -61,11 +61,11 @@ For more information, please refer to <https://unlicense.org>
 # define LYNIPV_CONSTRUCT_AT(p, ...) ::new(static_cast<void*>(p)) T(__VA_ARGS__)
 #endif
 
-namespace cpp26 {
+namespace lyn {
 
 template<class, std::size_t>
 class inplace_vector;
-namespace detail {
+namespace lyn_inplace_vector_detail {
 #if __cplusplus >= 201703L
     using std::is_nothrow_swappable;
 #else
@@ -195,13 +195,13 @@ namespace detail {
                                       typename std::conditional<std::is_trivially_copyable<T>::value, aligned_storage_trivial<T, N>,
                                                                 aligned_storage_non_trivial<T, N>>::type>::type;
     };
-} // namespace detail
+} // namespace lyn_inplace_vector_detail
 
 template<class T, std::size_t N>
-class inplace_vector : public detail::base_selector<T, N>::type {
+class inplace_vector : public lyn_inplace_vector_detail::base_selector<T, N>::type {
     static_assert(std::is_nothrow_destructible<T>::value,
                   "inplace_vector: classes with potentially throwing destructors are prohibited");
-    using base = typename detail::base_selector<T, N>::type;
+    using base = typename lyn_inplace_vector_detail::base_selector<T, N>::type;
     using base::construct;
     using base::destroy;
     using base::ptr;
@@ -281,7 +281,7 @@ public:
     constexpr inplace_vector(std::initializer_list<T> init) : inplace_vector(init.begin(), init.end()) {}
 
 #if __cplusplus >= 202302L && defined(__cpp_lib_containers_ranges)
-    template<detail::container_compatiblel_range<T> R>
+    template<lyn_inplace_vector_detail::container_compatiblel_range<T> R>
     constexpr inplace_vector(std::from_range_t, R&& rg) {
         if constexpr(std::ranges::sized_range<R>) {
             if(std::ranges::size(rg) > N) throw std::bad_alloc();
@@ -352,7 +352,7 @@ public:
     }
 
 #if __cplusplus >= 202002L
-    template<detail::container_compatiblel_range<T> R>
+    template<lyn_inplace_vector_detail::container_compatiblel_range<T> R>
     constexpr void assign_range(R&& rg)
         requires std::constructible_from<T&, std::ranges::range_reference_t<R>>
     {
@@ -360,7 +360,7 @@ public:
         append_range(std::forward<R>(rg));
     }
 
-    template<detail::container_compatiblel_range<T> R>
+    template<lyn_inplace_vector_detail::container_compatiblel_range<T> R>
     constexpr void append_range(R&& rg)
         requires std::constructible_from<T&, std::ranges::range_reference_t<R>>
     {
@@ -376,7 +376,7 @@ public:
         }
     }
 
-    template<detail::container_compatiblel_range<T> R>
+    template<lyn_inplace_vector_detail::container_compatiblel_range<T> R>
     constexpr std::ranges::borrowed_iterator_t<R> try_append_range(R&& rg)
         requires std::constructible_from<T&, std::ranges::range_reference_t<R>>
     {
@@ -654,8 +654,9 @@ public:
     }
 
     template<class U = T>
-    LYNIPV_CXX14_CONSTEXPR auto swap(inplace_vector& other) noexcept(N == 0 || (detail::is_nothrow_swappable<T>::value &&
-                                                                                std::is_nothrow_move_constructible<T>::value)) ->
+    LYNIPV_CXX14_CONSTEXPR auto swap(inplace_vector& other) noexcept(N == 0 ||
+                                                                     (lyn_inplace_vector_detail::is_nothrow_swappable<T>::value &&
+                                                                      std::is_nothrow_move_constructible<T>::value)) ->
         typename std::enable_if<!std::is_const<U>::value>::type {
         auto&& p = (size() < other.size()) ? std::pair<inplace_vector&, inplace_vector&>(*this, other)
                                            : std::pair<inplace_vector&, inplace_vector&>(other, *this);
@@ -673,7 +674,7 @@ public:
     }
 
     LYNIPV_CXX14_CONSTEXPR void friend swap(inplace_vector& lhs, inplace_vector& rhs) noexcept(
-        N == 0 || (detail::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value)) {
+        N == 0 || (lyn_inplace_vector_detail::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value)) {
         lhs.swap(rhs);
     }
 
@@ -712,7 +713,7 @@ LYNIPV_CXX14_CONSTEXPR typename inplace_vector<T, N>::size_type erase_if(inplace
     return r;
 }
 
-} // namespace cpp26
+} // namespace lyn
 
 // clean up defines
 #undef LYNIPV_CXX14_CONSTEXPR

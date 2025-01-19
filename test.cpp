@@ -7,29 +7,31 @@
 #include <string>
 #include <vector>
 
+using namespace lyn;
+
 // empty:
-template class cpp26::inplace_vector<int, 0>;
+template class lyn::inplace_vector<int, 0>;
 
 // trivial non-empty:
-template class cpp26::inplace_vector<int, 1>;
-template class cpp26::inplace_vector<int, 2>;
-template class cpp26::inplace_vector<const int, 3>;
+template class lyn::inplace_vector<int, 1>;
+template class lyn::inplace_vector<int, 2>;
+template class lyn::inplace_vector<const int, 3>;
 
 // non-trivial
-template class cpp26::inplace_vector<std::string, 3>;
-template class cpp26::inplace_vector<const std::string, 3>;
+template class lyn::inplace_vector<std::string, 3>;
+template class lyn::inplace_vector<const std::string, 3>;
 
 // move-only:
-template class cpp26::inplace_vector<const std::unique_ptr<int>, 3>;
-template class cpp26::inplace_vector<std::unique_ptr<int>, 3>;
+template class lyn::inplace_vector<const std::unique_ptr<int>, 3>;
+template class lyn::inplace_vector<std::unique_ptr<int>, 3>;
 
 template<class...>
 struct is_inplace_vector : std::false_type {};
 template<class T, std::size_t N>
-struct is_inplace_vector<cpp26::inplace_vector<T, N>> : std::true_type {};
+struct is_inplace_vector<inplace_vector<T, N>> : std::true_type {};
 
 static_assert(not is_inplace_vector<int>::value, "");
-static_assert(is_inplace_vector<cpp26::inplace_vector<int, 0>>::value, "");
+static_assert(is_inplace_vector<inplace_vector<int, 0>>::value, "");
 
 namespace {
 template<class T>
@@ -38,7 +40,7 @@ auto str(T&& val) -> typename std::enable_if<not is_inplace_vector<typename std:
 }
 
 template<class T, std::size_t N>
-std::string str(const cpp26::inplace_vector<T, N>& vec) {
+std::string str(const inplace_vector<T, N>& vec) {
     std::ostringstream os;
     os << '{';
     if(not vec.empty()) {
@@ -124,13 +126,13 @@ bool Assert(L&& lhs, R&& rhs, int line, Cond cond, const char* condstr) {
 #if __cplusplus >= 201402L
 namespace detail {
 template<class T, std::size_t... Is>
-constexpr cpp26::inplace_vector<T, sizeof...(Is)> make_inplace_vector_helper(std::index_sequence<Is...>) {
-    return cpp26::inplace_vector<T, sizeof...(Is)>{static_cast<T>(Is)...};
+constexpr inplace_vector<T, sizeof...(Is)> make_inplace_vector_helper(std::index_sequence<Is...>) {
+    return inplace_vector<T, sizeof...(Is)>{static_cast<T>(Is)...};
 }
 } // namespace detail
 template<class T, size_t N>
-constexpr cpp26::inplace_vector<T, N> make_inplace_vector() {
-    static_assert(!std::is_trivially_copyable<T>::value || std::is_trivially_copyable<cpp26::inplace_vector<T, N>>::value || N == 0,
+constexpr inplace_vector<T, N> make_inplace_vector() {
+    static_assert(!std::is_trivially_copyable<T>::value || std::is_trivially_copyable<inplace_vector<T, N>>::value || N == 0,
                   "triviality failure");
     return detail::make_inplace_vector_helper<T>(std::make_index_sequence<N>{});
 }
@@ -162,7 +164,7 @@ constexpr bool constexpr_test() {
 
 int main() {
     using T = std::string;
-    using IVS = cpp26::inplace_vector<T, 4>;
+    using IVS = inplace_vector<T, 4>;
     IVS iv;
     IVS other;
     // validate General container requirements
@@ -298,7 +300,7 @@ int main() {
     }
     {
         // const access
-        [](const cpp26::inplace_vector<std::string, 4>& r) {
+        [](const inplace_vector<std::string, 4>& r) {
             for(auto& _ : r) {
                 (void)_;
             }
@@ -310,7 +312,7 @@ int main() {
         vu.emplace_back(new int{1});
         vu.emplace_back(new int{2});
         vu.emplace_back(new int{3});
-        cpp26::inplace_vector<std::unique_ptr<int>, 3> mov;
+        inplace_vector<std::unique_ptr<int>, 3> mov;
         mov.assign(std::make_move_iterator(vu.begin()), std::make_move_iterator(vu.end()));
         assert(*mov[0] == 1);
         assert(*mov[1] == 2);
@@ -325,7 +327,7 @@ int main() {
     }
     std::cout << "--- trivial\n";
     {
-        cpp26::inplace_vector<int, 4> foo{1, 2, 3, 4};
+        inplace_vector<int, 4> foo{1, 2, 3, 4};
         auto bar = std::move(foo);
         ASSERT_EQ(foo.size(), size_t{4});
         ASSERT_EQ(foo[0], 1);
@@ -337,7 +339,7 @@ int main() {
         ASSERT_EQ(bar[1], 2);
         ASSERT_EQ(bar[2], 3);
         ASSERT_EQ(bar[3], 4);
-        cpp26::inplace_vector<int, 4> baz;
+        inplace_vector<int, 4> baz;
         baz = bar;
         ASSERT_EQ(baz.size(), size_t{4});
         ASSERT_EQ(baz[0], 1);
@@ -357,21 +359,21 @@ int main() {
     std::cout << "--- assign_range\n";
     {
         std::vector<std::string> v1{"Hello", "world"};
-        cpp26::inplace_vector<std::string, 3> r1{"1", "2", "3"};
+        inplace_vector<std::string, 3> r1{"1", "2", "3"};
         r1.assign_range(v1);
         assert(std::equal(v1.begin(), v1.end(), r1.begin(), r1.end()));
     }
     std::cout << "--- append_range\n";
     {
         std::vector<std::string> v1{"Hello", "world"};
-        cpp26::inplace_vector<std::string, 3> r1;
+        inplace_vector<std::string, 3> r1;
         r1.append_range(v1);
         assert(std::equal(v1.begin(), v1.end(), r1.begin(), r1.end()));
     }
     std::cout << "--- try_append_range\n";
     {
         std::vector<std::string> v1{"Hello", "world", "now", "we", "will", "see"};
-        cpp26::inplace_vector<std::string, 2> r1;
+        inplace_vector<std::string, 2> r1;
         auto it = r1.try_append_range(v1);
         assert(*it == "now");
         assert(std::equal(v1.begin(), std::next(v1.begin(), 2), r1.begin(), r1.end()));
@@ -382,7 +384,7 @@ int main() {
     std::cout << "--- from_range\n";
     {
         std::vector<std::string> v1{"Hello", "world"};
-        cpp26::inplace_vector<std::string, 4> r1(std::from_range, v1);
+        inplace_vector<std::string, 4> r1(std::from_range, v1);
         assert(std::equal(v1.begin(), v1.end(), r1.begin(), r1.end()));
     }
 #endif
