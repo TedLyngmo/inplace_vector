@@ -33,6 +33,13 @@ struct is_inplace_vector<inplace_vector<T, N>> : std::true_type {};
 static_assert(not is_inplace_vector<int>::value, "");
 static_assert(is_inplace_vector<inplace_vector<int, 0>>::value, "");
 
+class NonDefaultConstructible {
+public:
+    NonDefaultConstructible() = delete;
+    constexpr explicit NonDefaultConstructible(int) {}
+};
+static_assert(std::is_default_constructible<inplace_vector<NonDefaultConstructible, 2>>::value, "");
+
 namespace {
 template<class T>
 auto str(T&& val) -> typename std::enable_if<not is_inplace_vector<typename std::remove_reference<T>::type>::value, T>::type {

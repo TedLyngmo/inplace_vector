@@ -78,7 +78,7 @@ namespace lyn_inplace_vector_detail {
 #endif
     template<class T, std::size_t N>
     struct aligned_storage_non_trivial {
-        constexpr aligned_storage_non_trivial() noexcept = default;
+        constexpr aligned_storage_non_trivial() noexcept {}
 
         using value_type = typename std::remove_const<T>::type;
         using size_type = std::size_t;
@@ -122,7 +122,7 @@ namespace lyn_inplace_vector_detail {
     template<class T, std::size_t N>
     struct aligned_storage_trivial {
         static_assert(std::is_trivially_destructible<T>::value, "T must be trivially destructible");
-        constexpr aligned_storage_trivial() noexcept = default;
+        constexpr aligned_storage_trivial() noexcept {}
 
         using value_type = typename std::remove_const<T>::type;
         using size_type = std::size_t;
@@ -232,7 +232,7 @@ private:
 
 public:
     // constructors
-    constexpr inplace_vector() noexcept = default;
+    constexpr inplace_vector() noexcept {}
 
     template<bool D = std::is_default_constructible<T>::value, typename std::enable_if<D, int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR explicit inplace_vector(size_type count) {
