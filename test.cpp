@@ -315,6 +315,13 @@ int main() {
         assert(*mov[0] == 1);
         assert(*mov[1] == 2);
         assert(*mov[2] == 3);
+
+        auto empty_other = std::move(mov);
+        ASSERT_EQ(mov.size(), size_t{0});
+        ASSERT_EQ(mov.empty(), true);
+        assert(*empty_other[0] == 1);
+        assert(*empty_other[1] == 2);
+        assert(*empty_other[2] == 3);
     }
     std::cout << "--- trivial\n";
     {
@@ -330,6 +337,13 @@ int main() {
         ASSERT_EQ(bar[1], 2);
         ASSERT_EQ(bar[2], 3);
         ASSERT_EQ(bar[3], 4);
+        cpp26::inplace_vector<int, 4> baz;
+        baz = bar;
+        ASSERT_EQ(baz.size(), size_t{4});
+        ASSERT_EQ(baz[0], 1);
+        ASSERT_EQ(baz[1], 2);
+        ASSERT_EQ(baz[2], 3);
+        ASSERT_EQ(baz[3], 4);
     }
 
 #if __cplusplus >= 202002L

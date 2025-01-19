@@ -297,8 +297,8 @@ public:
 
     template<class U = T>
     LYNIPV_CXX14_CONSTEXPR auto operator=(const inplace_vector& other) ->
-        typename std::enable_if<std::is_copy_constructible<U>::value &&
-                                    not std::is_trivially_copyable<typename std::remove_reference<T>::type>::value,
+        typename std::enable_if<not(std::is_trivially_destructible<U>::value && std::is_trivially_copy_constructible<U>::value &&
+                                    std::is_trivially_copy_assignable<U>::value),
                                 inplace_vector&>::type {
         assign(other.begin(), other.end());
         return *this;
@@ -311,7 +311,9 @@ public:
     LYNIPV_CXX14_CONSTEXPR auto operator=(inplace_vector&& other) noexcept(
         N == 0 || (std::is_nothrow_move_assignable<T>::value && std::is_nothrow_move_constructible<T>::value &&
                    not std::is_trivially_copyable<typename std::remove_reference<T>::type>::value)) ->
-        typename std::enable_if<std::is_move_constructible<U>::value, inplace_vector&>::type {
+        typename std::enable_if<not(std::is_trivially_destructible<U>::value && std::is_trivially_move_constructible<U>::value &&
+                                    std::is_trivially_move_assignable<U>::value),
+                                inplace_vector&>::type {
         clear();
         std::move(other.begin(), other.end(), std::back_inserter(*this));
         other.clear();
