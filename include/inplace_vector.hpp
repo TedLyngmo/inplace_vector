@@ -47,26 +47,49 @@ For more information, please refer to <https://unlicense.org>
 #include <type_traits>
 #include <utility>
 
+namespace lyn {
+
+template<class, std::size_t>
+class inplace_vector;
+
+namespace lyn_inplace_vector_detail {
 #if __cplusplus >= 201402L
 # define LYNIPV_CXX14_CONSTEXPR constexpr
 #else
 # define LYNIPV_CXX14_CONSTEXPR
 #endif
 
+#if __cplusplus >= 201703L
+# define LYNIPV_LAUNDER(x) std::launder(x)
+    using std::is_nothrow_swappable;
+    template<class... B>
+    using conjunction = std::conjunction<B...>;
+#else
+# define LYNIPV_LAUNDER(x) x
+    template<typename U>
+    struct is_nothrow_swappable : std::integral_constant<bool, noexcept(swap(std::declval<U&>(), std::declval<U&>()))> {};
+
+    template<class...>
+    struct conjunction : std::true_type {};
+
+    template<class B1>
+    struct conjunction<B1> : B1 {};
+
+    template<class B1, class... Bn>
+    struct conjunction<B1, Bn...> : std::conditional<bool(B1::value), conjunction<Bn...>, B1>::type {};
+#endif
+
 #if __cplusplus >= 202002L
 # define LYNIPV_CXX20_CONSTEXPR constexpr
 # define LYNIPV_CONSTRUCT_AT(p, ...) std::construct_at(p __VA_OPT__(, ) __VA_ARGS__)
+    template<class R, class T>
+    concept container_compatiblel_range = std::ranges::input_range<R> && std::convertible_to<std::ranges::range_reference_t<R>, T>;
 #else
 # define LYNIPV_CXX20_CONSTEXPR
 # define LYNIPV_CONSTRUCT_AT(p, ...) ::new(static_cast<void*>(p)) T(__VA_ARGS__)
 #endif
 
-namespace lyn {
-
-template<class, std::size_t>
-class inplace_vector;
-namespace lyn_inplace_vector_detail {
-#ifdef LYNIPV_DEBUG
+#if defined(LYNIPV_DEBUG) && __cplusplus >= 201703L
     template<class T>
     struct LynIpvDebug {
         template<class... Args>
@@ -90,8 +113,12 @@ namespace lyn_inplace_vector_detail {
     // base requirements
     template<class T, std::size_t N>
     struct constexpr_compat :
-        std::integral_constant<bool, N == 0 || (std::is_trivially_default_constructible<T>::value &&
-                                                std::is_trivially_copyable<T>::value)> {};
+        std::integral_constant<
+            bool, N == 0 || (std::is_trivially_default_constructible<T>::value && std::is_trivially_copyable<T>::value &&
+                             // extra req. for now:
+                             std::is_trivially_copy_constructible<T>::value && std::is_trivially_move_constructible<T>::value &&
+                             std::is_trivially_copy_assignable<T>::value && std::is_trivially_move_assignable<T>::value &&
+                             std::is_trivially_destructible<T>::value)> {};
 
     template<class T, std::size_t N>
     struct trivial_copy_ctor :
@@ -114,113 +141,8 @@ namespace lyn_inplace_vector_detail {
     template<class T, std::size_t N>
     struct trivial_move_ass :
         std::integral_constant<bool, N == 0 || (std::is_trivially_destructible<T>::value &&
-                                                std::is_trivially_copy_constructible<T>::value &&
-                                                std::is_trivially_copy_assignable<T>::value)> {};
-
-    template<class T, std::size_t N>
-    struct base_selector {
-        using type =
-            typename std::conditional<N == 0, aligned_storage_empty<T>,
-                                      typename std::conditional<constexpr_compat<T, N>::value, aligned_storage_trivial<T, N>,
-                                                                aligned_storage_non_trivial<T, N>>::type>::type;
-    };
-
-#if __cplusplus >= 201703L
-    using std::is_nothrow_swappable;
-#else
-    template<typename U>
-    struct is_nothrow_swappable : std::integral_constant<bool, noexcept(swap(std::declval<U&>(), std::declval<U&>()))> {};
-#endif
-#if __cplusplus >= 202002L
-    template<class R, class T>
-    concept container_compatiblel_range = std::ranges::input_range<R> && std::convertible_to<std::ranges::range_reference_t<R>, T>;
-#endif
-    template<class T, std::size_t N>
-    struct aligned_storage_non_trivial {
-        constexpr aligned_storage_non_trivial() noexcept {}
-
-        using value_type = typename std::remove_const<T>::type;
-        using size_type = std::size_t;
-        using reference = value_type&;
-        using const_reference = value_type const&;
-        using pointer = value_type*;
-        using const_pointer = value_type const*;
-
-        // destructor
-        LYNIPV_CXX20_CONSTEXPR ~aligned_storage_non_trivial() noexcept { static_cast<inplace_vector<T, N>*>(this)->clear(); }
-
-        LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type idx) noexcept { return std::addressof(m_data[idx].data); }
-        LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type idx) const noexcept { return std::addressof(m_data[idx].data); }
-        LYNIPV_CXX14_CONSTEXPR reference ref(size_type idx) noexcept { return m_data[idx].data; }
-        LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type idx) const noexcept { return m_data[idx].data; }
-
-        template<class... Args>
-        LYNIPV_CXX20_CONSTEXPR reference construct(size_type idx, Args&&... args) {
-            return *LYNIPV_CONSTRUCT_AT(ptr(idx), std::forward<Args>(args)...);
-        }
-        LYNIPV_CXX14_CONSTEXPR void destroy(size_type idx) noexcept { ref(idx).~T(); }
-
-        LYNIPV_CXX14_CONSTEXPR reference operator[](size_type idx) noexcept { return ref(idx); }
-        constexpr const_reference operator[](size_type idx) const noexcept { return ref(idx); }
-
-        constexpr size_type size() const noexcept { return m_size; }
-
-        LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
-        LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
-
-    private:
-        union raw {
-            LYNIPV_CXX14_CONSTEXPR raw() : dummy{} {}
-            LYNIPV_CXX20_CONSTEXPR ~raw() {}
-            char dummy;
-            value_type data;
-        };
-        std::array<raw, N> m_data;
-        static_assert(sizeof m_data == sizeof(T[N]), "erroneous size");
-        size_type m_size = 0;
-    };
-
-    template<class T, std::size_t N>
-    struct aligned_storage_trivial {
-        static_assert(std::is_trivially_destructible<T>::value, "T must be trivially destructible");
-        constexpr aligned_storage_trivial() noexcept = default;
-
-        using value_type = typename std::remove_const<T>::type;
-        using size_type = std::size_t;
-        using reference = value_type&;
-        using const_reference = value_type const&;
-        using pointer = value_type*;
-        using const_pointer = value_type const*;
-
-        LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type idx) noexcept { return std::addressof(m_data[idx].data); }
-        LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type idx) const noexcept { return std::addressof(m_data[idx].data); }
-        LYNIPV_CXX14_CONSTEXPR reference ref(size_type idx) noexcept { return m_data[idx].data; }
-        LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type idx) const noexcept { return m_data[idx].data; }
-
-        template<class... Args>
-        LYNIPV_CXX20_CONSTEXPR reference construct(size_type idx, Args&&... args) {
-            return *LYNIPV_CONSTRUCT_AT(ptr(idx), std::forward<Args>(args)...);
-        }
-        LYNIPV_CXX14_CONSTEXPR void destroy(size_type idx) noexcept { ref(idx).~T(); }
-
-        LYNIPV_CXX14_CONSTEXPR reference operator[](size_type idx) noexcept { return ref(idx); }
-        constexpr const_reference operator[](size_type idx) const noexcept { return ref(idx); }
-
-        constexpr size_type size() const noexcept { return m_size; }
-
-        LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
-        LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
-
-    private:
-        union raw {
-            constexpr raw() : dummy{} {}
-            char dummy;
-            value_type data;
-        };
-        std::array<raw, N> m_data;
-        static_assert(sizeof m_data == sizeof(T[N]), "erroneous size");
-        size_type m_size = 0;
-    };
+                                                std::is_trivially_move_constructible<T>::value &&
+                                                std::is_trivially_move_assignable<T>::value)> {};
 
     template<class T>
     struct aligned_storage_empty { // specialization for 0 elements
@@ -231,13 +153,14 @@ namespace lyn_inplace_vector_detail {
         using pointer = value_type*;
         using const_pointer = value_type const*;
 
+    protected:
         LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type) { return nullptr; }
         LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type) const { return nullptr; }
         LYNIPV_CXX14_CONSTEXPR reference ref(size_type) { return *ptr(0); }
         LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type) const { return *ptr(0); }
 
         template<class... Args>
-        LYNIPV_CXX20_CONSTEXPR reference construct(size_type, Args&&...) {
+        LYNIPV_CXX20_CONSTEXPR reference construct_back(Args&&...) {
             return *ptr(0);
         }
         LYNIPV_CXX14_CONSTEXPR void destroy(size_type) {}
@@ -246,18 +169,206 @@ namespace lyn_inplace_vector_detail {
         constexpr const_reference operator[](size_type) const { return *ptr(0); }
 
         constexpr size_type size() const noexcept { return 0; }
+        LYNIPV_CXX14_CONSTEXPR void clear() noexcept {}
 
         LYNIPV_CXX14_CONSTEXPR size_type inc() { return 0; }
         LYNIPV_CXX14_CONSTEXPR size_type dec(size_type = 1) { return 0; }
     };
+
+    template<class T, std::size_t N>
+    struct aligned_storage_trivial {
+        static_assert(std::is_trivially_destructible<T>::value, "T must be trivially destructible");
+
+        using value_type = typename std::remove_const<T>::type;
+        using size_type = std::size_t;
+        using reference = value_type&;
+        using const_reference = value_type const&;
+        using pointer = value_type*;
+        using const_pointer = value_type const*;
+
+    protected:
+        LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type idx) noexcept { return std::addressof(m_data[idx]); }
+        LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type idx) const noexcept { return std::addressof(m_data[idx]); }
+        LYNIPV_CXX14_CONSTEXPR reference ref(size_type idx) noexcept { return m_data[idx]; }
+        LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type idx) const noexcept { return m_data[idx]; }
+
+        template<class... Args>
+        LYNIPV_CXX20_CONSTEXPR reference construct_back(Args&&... args) {
+            auto& rv = m_data[m_size] = value_type{std::forward<Args>(args)...};
+            ++m_size;
+            return rv;
+        }
+        LYNIPV_CXX14_CONSTEXPR void destroy(size_type) noexcept {}
+
+        LYNIPV_CXX14_CONSTEXPR reference operator[](size_type idx) noexcept { return ref(idx); }
+        constexpr const_reference operator[](size_type idx) const noexcept { return ref(idx); }
+
+        constexpr size_type size() const noexcept { return m_size; }
+        LYNIPV_CXX14_CONSTEXPR void clear() noexcept { m_size = 0; }
+
+        LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
+        LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
+
+    private:
+        std::array<value_type, N> m_data;
+        size_type m_size = 0;
+    };
+
+    template<class T, std::size_t N>
+    struct aligned_storage_non_trivial {
+        using value_type = typename std::remove_const<T>::type;
+        using size_type = std::size_t;
+        using reference = value_type&;
+        using const_reference = value_type const&;
+        using pointer = value_type*;
+        using const_pointer = value_type const*;
+
+    protected:
+        LYNIPV_CXX14_CONSTEXPR pointer ptr(size_type idx) noexcept { return m_data[idx].ptr(); }
+        LYNIPV_CXX14_CONSTEXPR const_pointer ptr(size_type idx) const noexcept { return m_data[idx].ptr(); }
+        LYNIPV_CXX14_CONSTEXPR reference ref(size_type idx) noexcept { return *ptr(idx); }
+        LYNIPV_CXX14_CONSTEXPR const_reference ref(size_type idx) const noexcept { return *ptr(idx); }
+
+        template<class... Args>
+        LYNIPV_CXX20_CONSTEXPR reference construct_back(Args&&... args) noexcept(std::is_nothrow_constructible<T, Args...>::value) {
+            auto& rv = *LYNIPV_CONSTRUCT_AT(ptr(m_size), std::forward<Args>(args)...);
+            ++m_size;
+            return rv;
+        }
+        LYNIPV_CXX14_CONSTEXPR void destroy(size_type idx) noexcept { ref(idx).~T(); }
+
+        LYNIPV_CXX14_CONSTEXPR reference operator[](size_type idx) noexcept { return ref(idx); }
+        constexpr const_reference operator[](size_type idx) const noexcept { return ref(idx); }
+
+        constexpr size_type size() const noexcept { return m_size; }
+
+        LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
+        LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
+        LYNIPV_CXX14_CONSTEXPR void clear() noexcept(std::is_nothrow_destructible<T>::value) {
+            while(m_size) {
+                destroy(--m_size);
+            }
+        }
+
+    private:
+        struct alignas(T) inner_storage {
+            std::array<unsigned char, sizeof(T)> data;
+            pointer ptr() noexcept { return LYNIPV_LAUNDER(reinterpret_cast<pointer>(data.data())); }
+            const_pointer ptr() const noexcept { return LYNIPV_LAUNDER(reinterpret_cast<const_pointer>(data.data())); }
+        };
+
+        std::array<inner_storage, N> m_data;
+        static_assert(sizeof m_data == sizeof(T[N]), "erroneous size");
+        size_type m_size = 0;
+    };
+
+    template<class T, std::size_t N>
+    struct non_trivial_destructor : aligned_storage_non_trivial<T, N> {
+        LYNIPV_CXX14_CONSTEXPR non_trivial_destructor() = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_destructor(const non_trivial_destructor&) = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_destructor(non_trivial_destructor&&) noexcept = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_destructor& operator=(const non_trivial_destructor&) = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_destructor& operator=(non_trivial_destructor&&) noexcept = default;
+        LYNIPV_CXX20_CONSTEXPR ~non_trivial_destructor() noexcept(std::is_nothrow_destructible<T>::value) {
+            TRACE_ENTER("~non_trival_destructor");
+            this->clear();
+        }
+    };
+    template<class T, std::size_t N>
+    struct dtor_selector :
+        std::conditional<std::is_trivially_destructible<T>::value, aligned_storage_non_trivial<T, N>,
+                         non_trivial_destructor<T, N>>::type {};
+
+    template<class T, std::size_t N>
+    struct non_trivial_copy_ass : dtor_selector<T, N> {
+        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ass() = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ass(const non_trivial_copy_ass&) = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ass(non_trivial_copy_ass&&) noexcept = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ass& operator=(const non_trivial_copy_ass& other) {
+            TRACE_ENTER("operator=(const non_trivial_copy_ass& other)");
+            auto& Self = *static_cast<inplace_vector<T, N>*>(this);
+            auto& ipo = static_cast<const inplace_vector<T, N>&>(other);
+            Self.assign(ipo.begin(), ipo.begin());
+            return *this;
+        }
+        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ass& operator=(non_trivial_copy_ass&&) noexcept = default;
+        LYNIPV_CXX20_CONSTEXPR ~non_trivial_copy_ass() = default;
+    };
+    template<class T, std::size_t N>
+    struct copy_ass_selector :
+        std::conditional<trivial_copy_ass<T, N>::value, dtor_selector<T, N>, non_trivial_copy_ass<T, N>>::type {};
+
+    template<class T, std::size_t N>
+    struct non_trivial_move_ass : copy_ass_selector<T, N> {
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass() = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass(const non_trivial_move_ass&) = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass(non_trivial_move_ass&&) noexcept = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass& operator=(const non_trivial_move_ass&) = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass& operator=(non_trivial_move_ass&& other) noexcept(
+            std::is_nothrow_move_assignable<T>::value && std::is_nothrow_move_constructible<T>::value) {
+            TRACE_ENTER("operator=(non_trivial_move_ass&& other)");
+            auto& Self = *static_cast<inplace_vector<T, N>*>(this);
+            auto& ipo = static_cast<inplace_vector<T, N>&>(other);
+            Self.clear();
+            std::move(ipo.begin(), ipo.end(), std::back_inserter(Self));
+            ipo.clear();
+            return *this;
+        }
+    };
+    template<class T, std::size_t N>
+    struct move_ass_selector :
+        std::conditional<trivial_move_ass<T, N>::value, copy_ass_selector<T, N>, non_trivial_move_ass<T, N>>::type {};
+
+    template<class T, std::size_t N>
+    struct non_trivial_copy_ctor : move_ass_selector<T, N> {
+        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor() = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor(const non_trivial_copy_ctor&) {
+            TRACE_ENTER("non_trivial_copy_ctor(const non_trivial_copy_ctor& other)");
+        }
+        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor(non_trivial_copy_ctor&&) noexcept = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor& operator=(const non_trivial_copy_ctor& other) = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor& operator=(non_trivial_copy_ctor&&) noexcept = default;
+        LYNIPV_CXX20_CONSTEXPR ~non_trivial_copy_ctor() = default;
+    };
+    template<class T, std::size_t N>
+    struct copy_ctor_selector :
+        std::conditional<trivial_copy_ctor<T, N>::value, move_ass_selector<T, N>, non_trivial_copy_ctor<T, N>>::type {};
+
+    template<class T, std::size_t N>
+    struct non_trivial_move_ctor : copy_ctor_selector<T, N> {
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ctor() = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ctor(const non_trivial_move_ctor&) = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ctor(non_trivial_move_ctor&& other) noexcept(
+            std::is_nothrow_move_constructible<T>::value) {
+            TRACE_ENTER("non_trivial_move_ctor(non_trivial_move_ctor&& other)");
+            for(decltype(this->size()) idx = 0; idx != other.size(); ++idx) {
+                this->construct_back(std::move(other.ref(idx)));
+            }
+            static_cast<inplace_vector<T, N>&>(other).clear();
+        }
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ctor& operator=(const non_trivial_move_ctor& other) = default;
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ctor& operator=(non_trivial_move_ctor&&) noexcept = default;
+        LYNIPV_CXX20_CONSTEXPR ~non_trivial_move_ctor() = default;
+    };
+    template<class T, std::size_t N>
+    struct move_ctor_selector :
+        std::conditional<trivial_move_ctor<T, N>::value, copy_ctor_selector<T, N>, non_trivial_move_ctor<T, N>>::type {};
+
+    template<class T, std::size_t N>
+    struct trivial_selector :
+        std::conditional<constexpr_compat<T, N>::value, aligned_storage_trivial<T, N>, move_ctor_selector<T, N>>::type {};
+
+    template<class T, std::size_t N>
+    struct base_selector : std::conditional<N == 0, aligned_storage_empty<T>, trivial_selector<T, N>>::type {};
 } // namespace lyn_inplace_vector_detail
 
 template<class T, std::size_t N>
-class inplace_vector : public lyn_inplace_vector_detail::base_selector<T, N>::type {
+class inplace_vector : public lyn_inplace_vector_detail::base_selector<T, N> {
     static_assert(std::is_nothrow_destructible<T>::value,
                   "inplace_vector: classes with potentially throwing destructors are prohibited");
-    using base = typename lyn_inplace_vector_detail::base_selector<T, N>::type;
-    using base::construct;
+    using base = lyn_inplace_vector_detail::base_selector<T, N>;
+    using base::construct_back;
+    using base::dec;
     using base::destroy;
     using base::ptr;
     using base::ref;
@@ -265,6 +376,7 @@ class inplace_vector : public lyn_inplace_vector_detail::base_selector<T, N>::ty
 public:
     using base::size;
     using base::operator[];
+    using base::clear;
 
     using value_type = T;
     using size_type = std::size_t;
@@ -286,7 +398,7 @@ private:
     }
 
 public:
-    // constructors
+    // constructors - copy/move (if any) are defined in the base classes
     constexpr inplace_vector() noexcept = default;
 
     template<bool D = std::is_default_constructible<T>::value, typename std::enable_if<D, int>::type = 0>
@@ -301,31 +413,11 @@ public:
         while(count != size()) unchecked_push_back(value);
     }
 
-    template<class InputIt, typename std::enable_if<
-                                std::is_constructible<typename std::iterator_traits<InputIt>::value_type>::value, int>::type = 0>
+    template<
+        class InputIt, class U = T,
+        typename std::enable_if<std::is_constructible<U, typename std::iterator_traits<InputIt>::value_type>::value, int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR inplace_vector(InputIt first, InputIt last) {
         std::copy(first, last, std::back_inserter(*this));
-    }
-
-    LYNIPV_CXX14_CONSTEXPR inplace_vector(const inplace_vector& other) = default; // for trivial types
-
-    template<class U = T, typename std::enable_if<not lyn_inplace_vector_detail::trivial_copy_ctor<U, N>::value, int>::type = 0>
-    LYNIPV_CXX14_CONSTEXPR inplace_vector(const inplace_vector& other) {
-        TRACE_ENTER("inplace_vector(const inplace_vector& other)");
-        for(auto& val : other) {
-            unchecked_push_back(val);
-        }
-    }
-
-    LYNIPV_CXX14_CONSTEXPR inplace_vector(inplace_vector&& other) noexcept = default; // for trivial types
-
-    template<class U = T, typename std::enable_if<not lyn_inplace_vector_detail::trivial_move_ctor<U, N>::value, int>::type = 0>
-    LYNIPV_CXX14_CONSTEXPR inplace_vector(inplace_vector&& other) noexcept(N == 0 || std::is_nothrow_move_constructible<T>::value) {
-        TRACE_ENTER("inplace_vector(inplace_vector&& other)");
-        for(auto& val : other) {
-            unchecked_push_back(std::move(val));
-        }
-        other.clear();
     }
 
     template<bool C = std::is_copy_constructible<T>::value, typename std::enable_if<C, int>::type = 0>
@@ -343,31 +435,7 @@ public:
     }
 #endif
 
-    // assignment
-    LYNIPV_CXX14_CONSTEXPR inplace_vector& operator=(const inplace_vector& other) = default; // for trivial types
-
-    template<class U = T>
-    LYNIPV_CXX14_CONSTEXPR auto operator=(const inplace_vector& other) ->
-        typename std::enable_if<not lyn_inplace_vector_detail::trivial_copy_ass<U, N>::value, inplace_vector&>::type {
-        TRACE_ENTER("operator=(const inplace_vector& other)");
-        assign(other.begin(), other.end());
-        return *this;
-    }
-
-    LYNIPV_CXX14_CONSTEXPR inplace_vector& operator=(inplace_vector&& other) noexcept(
-        N == 0 || (std::is_nothrow_move_assignable<T>::value)) = default; // for trivial types
-
-    template<class U = typename std::remove_reference<T>::type>
-    LYNIPV_CXX14_CONSTEXPR auto operator=(inplace_vector&& other) noexcept(N == 0 || (std::is_nothrow_move_assignable<T>::value &&
-                                                                                      std::is_nothrow_move_constructible<T>::value))
-        -> typename std::enable_if<not lyn_inplace_vector_detail::trivial_move_ass<U, N>::value, inplace_vector&>::type {
-        TRACE_ENTER("operator=(inplace_vector&& other)");
-        clear();
-        std::move(other.begin(), other.end(), std::back_inserter(*this));
-        other.clear();
-        return *this;
-    }
-
+    // assignment - copy/move (if any) are defined in the base classes
     template<class U = T>
     LYNIPV_CXX14_CONSTEXPR auto operator=(std::initializer_list<T> init) ->
         typename std::enable_if<std::is_copy_constructible<U>::value, inplace_vector&>::type {
@@ -384,9 +452,9 @@ public:
         while(count != size()) push_back(value);
     }
 
-    template<class InputIt>
+    template<class InputIt, class U = T>
     LYNIPV_CXX14_CONSTEXPR auto assign(InputIt first, InputIt last) ->
-        typename std::enable_if<std::is_constructible<T, typename std::iterator_traits<InputIt>::value_type>::value>::type {
+        typename std::enable_if<std::is_constructible<U, typename std::iterator_traits<InputIt>::value_type>::value>::type {
         clear();
         std::copy(first, last, std::back_inserter(*this));
     }
@@ -579,7 +647,7 @@ public:
     }
     template<class InputIt, class U = T>
     LYNIPV_CXX20_CONSTEXPR auto insert(const_iterator pos, InputIt first, InputIt last) ->
-        typename std::enable_if<std::is_constructible<typename std::iterator_traits<InputIt>::value_type>::value &&
+        typename std::enable_if<std::is_constructible<U, typename std::iterator_traits<InputIt>::value_type>::value &&
                                     !std::is_const<U>::value,
                                 iterator>::type {
         // static_assert(std::is_nothrow_move_assignable<T>::value, "only nothrow move assignable types may be used for now");
@@ -616,25 +684,19 @@ public:
     template<class... Args>
     LYNIPV_CXX14_CONSTEXPR auto unchecked_emplace_back(Args&&... args) ->
         typename std::enable_if<std::is_constructible<T, Args...>::value, reference>::type {
-        auto& rv = construct(size(), std::forward<Args>(args)...);
-        this->inc();
-        return rv;
+        return construct_back(std::forward<Args>(args)...);
     }
 
     template<class U = T>
     LYNIPV_CXX14_CONSTEXPR auto unchecked_push_back(T const& value) ->
         typename std::enable_if<std::is_copy_constructible<U>::value, reference>::type {
-        auto& rv = construct(size(), value);
-        this->inc();
-        return rv;
+        return construct_back(value);
     }
 
     template<class U = T>
     LYNIPV_CXX14_CONSTEXPR auto unchecked_push_back(T&& value) ->
         typename std::enable_if<std::is_move_constructible<U>::value, reference>::type {
-        auto& rv = construct(size(), std::move(value));
-        this->inc();
-        return rv;
+        return construct_back(std::move(value));
     }
 
     template<class... Args>
@@ -679,8 +741,7 @@ public:
         return std::addressof(unchecked_push_back(std::move(value)));
     }
 
-    LYNIPV_CXX14_CONSTEXPR void pop_back() noexcept { destroy(this->dec()); }
-    LYNIPV_CXX14_CONSTEXPR void clear() noexcept { shrink_to(0); }
+    LYNIPV_CXX14_CONSTEXPR void pop_back() noexcept { destroy(dec()); }
 
     template<class U = T>
     LYNIPV_CXX14_CONSTEXPR auto erase(const_iterator first, const_iterator last) ->
@@ -692,7 +753,7 @@ public:
         for(size_type idx = size() - removed; idx < size(); ++idx) {
             destroy(idx);
         }
-        this->dec(removed);
+        dec(removed);
         return ncfirst;
     }
 
@@ -716,12 +777,12 @@ public:
             swap(small[idx], large[idx]);
         }
         for(; idx < large.size(); ++idx) {
-            small.push_back(std::move(large[idx]));
+            small.unchecked_push_back(std::move(large[idx]));
         }
         large.shrink_to(small_size);
     }
 
-    LYNIPV_CXX14_CONSTEXPR void friend swap(inplace_vector& lhs, inplace_vector& rhs) noexcept(
+    LYNIPV_CXX14_CONSTEXPR friend void swap(inplace_vector& lhs, inplace_vector& rhs) noexcept(
         N == 0 || (lyn_inplace_vector_detail::is_nothrow_swappable<T>::value && std::is_nothrow_move_constructible<T>::value)) {
         lhs.swap(rhs);
     }
@@ -767,5 +828,6 @@ LYNIPV_CXX14_CONSTEXPR typename inplace_vector<T, N>::size_type erase_if(inplace
 #undef LYNIPV_CXX14_CONSTEXPR
 #undef LYNIPV_CXX20_CONSTEXPR
 #undef LYNIPV_CONSTRUCT_AT
+#undef LYNIPV_LAUNDER
 
 #endif

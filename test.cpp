@@ -37,6 +37,12 @@ struct is_inplace_vector<inplace_vector<T, N>> : std::true_type {};
 static_assert(not is_inplace_vector<int>::value, "");
 static_assert(is_inplace_vector<inplace_vector<int, 0>>::value, "");
 
+struct dummy {
+    std::string d1;
+    std::size_t d2;
+};
+static_assert(sizeof(dummy) == sizeof(inplace_vector<std::string, 1>), "");
+
 class NonDefaultConstructible {
 public:
     NonDefaultConstructible() = delete;
@@ -268,13 +274,21 @@ int main() {
         std::cout << " tmp <- iv" << std::endl;
         IVS tmp(std::move(iv));
         assert(iv.size() == 0);
+        assert(tmp.size() == 4);
+        assert(other.size() == 0);
+
         std::cout << " iv <- other" << std::endl;
         iv = std::move(other);
+        assert(iv.size() == 0);
+        assert(other.size() == 0);
+        assert(tmp.size() == 4);
+
         std::cout << " other <- tmp" << std::endl;
         other = std::move(tmp);
-        std::cout << " done" << std::endl;
+        assert(other.size() == 4);
         assert(iv.size() == 0);
-        ASSERT_EQ(other.size(), 4u);
+
+        std::cout << " done" << std::endl;
     }
     std::cout << "--- std::swap\n";
     {
