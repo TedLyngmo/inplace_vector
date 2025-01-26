@@ -87,6 +87,44 @@ namespace lyn_inplace_vector_detail {
 # define TRACE_ENTER(...)
 #endif
 
+    // base requirements
+    template<class T, std::size_t N>
+    struct constexpr_compat :
+        std::integral_constant<bool, N == 0 || (std::is_trivially_default_constructible<T>::value &&
+                                                std::is_trivially_copyable<T>::value)> {};
+
+    template<class T, std::size_t N>
+    struct trivial_copy_ctor :
+        std::integral_constant<bool,
+                               N == 0 || (std::is_copy_constructible<T>::value && std::is_trivially_copy_constructible<T>::value)> {
+    };
+
+    template<class T, std::size_t N>
+    struct trivial_move_ctor :
+        std::integral_constant<bool,
+                               N == 0 || (std::is_move_constructible<T>::value && std::is_trivially_move_constructible<T>::value)> {
+    };
+
+    template<class T, std::size_t N>
+    struct trivial_copy_ass :
+        std::integral_constant<bool, N == 0 || (std::is_trivially_destructible<T>::value &&
+                                                std::is_trivially_copy_constructible<T>::value &&
+                                                std::is_trivially_copy_assignable<T>::value)> {};
+
+    template<class T, std::size_t N>
+    struct trivial_move_ass :
+        std::integral_constant<bool, N == 0 || (std::is_trivially_destructible<T>::value &&
+                                                std::is_trivially_copy_constructible<T>::value &&
+                                                std::is_trivially_copy_assignable<T>::value)> {};
+
+    template<class T, std::size_t N>
+    struct base_selector {
+        using type =
+            typename std::conditional<N == 0, aligned_storage_empty<T>,
+                                      typename std::conditional<constexpr_compat<T, N>::value, aligned_storage_trivial<T, N>,
+                                                                aligned_storage_non_trivial<T, N>>::type>::type;
+    };
+
 #if __cplusplus >= 201703L
     using std::is_nothrow_swappable;
 #else
@@ -132,8 +170,9 @@ namespace lyn_inplace_vector_detail {
 
     private:
         union raw {
+            LYNIPV_CXX14_CONSTEXPR raw() : dummy{} {}
             LYNIPV_CXX20_CONSTEXPR ~raw() {}
-            char dummy{};
+            char dummy;
             value_type data;
         };
         std::array<raw, N> m_data;
@@ -144,7 +183,7 @@ namespace lyn_inplace_vector_detail {
     template<class T, std::size_t N>
     struct aligned_storage_trivial {
         static_assert(std::is_trivially_destructible<T>::value, "T must be trivially destructible");
-        constexpr aligned_storage_trivial() noexcept {}
+        constexpr aligned_storage_trivial() noexcept = default;
 
         using value_type = typename std::remove_const<T>::type;
         using size_type = std::size_t;
@@ -211,14 +250,6 @@ namespace lyn_inplace_vector_detail {
         LYNIPV_CXX14_CONSTEXPR size_type inc() { return 0; }
         LYNIPV_CXX14_CONSTEXPR size_type dec(size_type = 1) { return 0; }
     };
-
-    template<class T, std::size_t N>
-    struct base_selector {
-        using type =
-            typename std::conditional<N == 0, aligned_storage_empty<T>,
-                                      typename std::conditional<std::is_trivially_copyable<T>::value, aligned_storage_trivial<T, N>,
-                                                                aligned_storage_non_trivial<T, N>>::type>::type;
-    };
 } // namespace lyn_inplace_vector_detail
 
 template<class T, std::size_t N>
@@ -278,25 +309,21 @@ public:
 
     LYNIPV_CXX14_CONSTEXPR inplace_vector(const inplace_vector& other) = default; // for trivial types
 
-    template<class U = T,
-             typename std::enable_if<std::is_copy_constructible<U>::value && not std::is_trivially_copy_constructible<U>::value,
-                                     int>::type = 0>
+    template<class U = T, typename std::enable_if<not lyn_inplace_vector_detail::trivial_copy_ctor<U, N>::value, int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR inplace_vector(const inplace_vector& other) {
         TRACE_ENTER("inplace_vector(const inplace_vector& other)");
-        for(size_type idx = 0; idx != other.size(); ++idx) {
-            unchecked_push_back(other[idx]);
+        for(auto& val : other) {
+            unchecked_push_back(val);
         }
     }
 
     LYNIPV_CXX14_CONSTEXPR inplace_vector(inplace_vector&& other) noexcept = default; // for trivial types
 
-    template<class U = T,
-             typename std::enable_if<std::is_move_constructible<U>::value && not std::is_trivially_move_constructible<U>::value,
-                                     int>::type = 0>
+    template<class U = T, typename std::enable_if<not lyn_inplace_vector_detail::trivial_move_ctor<U, N>::value, int>::type = 0>
     LYNIPV_CXX14_CONSTEXPR inplace_vector(inplace_vector&& other) noexcept(N == 0 || std::is_nothrow_move_constructible<T>::value) {
         TRACE_ENTER("inplace_vector(inplace_vector&& other)");
-        for(size_type idx = 0; idx != other.size(); ++idx) {
-            unchecked_push_back(std::move(other[idx]));
+        for(auto& val : other) {
+            unchecked_push_back(std::move(val));
         }
         other.clear();
     }
@@ -321,9 +348,7 @@ public:
 
     template<class U = T>
     LYNIPV_CXX14_CONSTEXPR auto operator=(const inplace_vector& other) ->
-        typename std::enable_if<not(std::is_trivially_destructible<U>::value && std::is_trivially_copy_constructible<U>::value &&
-                                    std::is_trivially_copy_assignable<U>::value),
-                                inplace_vector&>::type {
+        typename std::enable_if<not lyn_inplace_vector_detail::trivial_copy_ass<U, N>::value, inplace_vector&>::type {
         TRACE_ENTER("operator=(const inplace_vector& other)");
         assign(other.begin(), other.end());
         return *this;
@@ -332,13 +357,10 @@ public:
     LYNIPV_CXX14_CONSTEXPR inplace_vector& operator=(inplace_vector&& other) noexcept(
         N == 0 || (std::is_nothrow_move_assignable<T>::value)) = default; // for trivial types
 
-    template<class U = T>
-    LYNIPV_CXX14_CONSTEXPR auto operator=(inplace_vector&& other) noexcept(
-        N == 0 || (std::is_nothrow_move_assignable<T>::value && std::is_nothrow_move_constructible<T>::value &&
-                   not std::is_trivially_copyable<typename std::remove_reference<T>::type>::value)) ->
-        typename std::enable_if<not(std::is_trivially_destructible<U>::value && std::is_trivially_move_constructible<U>::value &&
-                                    std::is_trivially_move_assignable<U>::value),
-                                inplace_vector&>::type {
+    template<class U = typename std::remove_reference<T>::type>
+    LYNIPV_CXX14_CONSTEXPR auto operator=(inplace_vector&& other) noexcept(N == 0 || (std::is_nothrow_move_assignable<T>::value &&
+                                                                                      std::is_nothrow_move_constructible<T>::value))
+        -> typename std::enable_if<not lyn_inplace_vector_detail::trivial_move_ass<U, N>::value, inplace_vector&>::type {
         TRACE_ENTER("operator=(inplace_vector&& other)");
         clear();
         std::move(other.begin(), other.end(), std::back_inserter(*this));
@@ -683,7 +705,7 @@ public:
     LYNIPV_CXX14_CONSTEXPR auto swap(inplace_vector& other) noexcept(N == 0 ||
                                                                      (lyn_inplace_vector_detail::is_nothrow_swappable<T>::value &&
                                                                       std::is_nothrow_move_constructible<T>::value)) ->
-        typename std::enable_if<!std::is_const<U>::value>::type {
+        typename std::enable_if<not std::is_const<U>::value>::type {
         auto&& p = (size() < other.size()) ? std::pair<inplace_vector&, inplace_vector&>(*this, other)
                                            : std::pair<inplace_vector&, inplace_vector&>(other, *this);
         auto& small = p.first;

@@ -6,7 +6,7 @@
 #include <vector>
 
 #if __cplusplus >= 201703L
-#define LYNIPV_DEBUG
+# define LYNIPV_DEBUG
 #endif
 
 #include "inplace_vector.hpp"
@@ -59,13 +59,14 @@ template<class T>
 void validate() {
     using namespace std;
     using namespace lyn;
-    using IV = inplace_vector<T,1>;
+    using IV = inplace_vector<T, 1>;
     std::ostringstream oss;
     oss << std::boolalpha;
     oss << __PRETTY_FUNCTION__ << '\n'
         << " is_trivially_copyable              " << is_trivially_copyable<T>::value << '\n'
         << " is_trivially_default_constructible " << is_trivially_default_constructible<T>::value << '\n'
-        << " usable in constant expressions     " << (is_trivially_copyable<T>::value && is_trivially_default_constructible<T>::value) << '\n' //
+        << " usable in constant expressions     "
+        << (is_trivially_copyable<T>::value && is_trivially_default_constructible<T>::value) << '\n' //
         << '\n'
         << " is_trivially_copy_constructible<T>                   " << is_trivially_copy_constructible<T>::value << '\n'
         << " is_trivially_copy_constructible<inplace_vector<T,1>> " << is_trivially_copy_constructible<IV>::value << '\n' //
@@ -73,14 +74,14 @@ void validate() {
         << " is_trivially_move_constructible<T>                   " << is_trivially_move_constructible<T>::value << '\n'
         << " is_trivially_move_constructible<inplace_vector<T,1>> " << is_trivially_move_constructible<IV>::value << '\n' //
         << '\n'
-        << " is_trivially_destructible<T>                         " << is_trivially_destructible<T>::value << '\n'
-        << " is_trivially_destructible<inplace_vector<T,1>>       " << is_trivially_destructible<IV>::value << '\n' //
-        << '\n'
         << " is_trivially_copy_assignable<T>                      " << is_trivially_copy_assignable<T>::value << '\n'
         << " is_trivially_copy_assignable<inplace_vector<T,1>>    " << is_trivially_copy_assignable<IV>::value << '\n' //
         << '\n'
         << " is_trivially_move_assignable<T>                      " << is_trivially_move_assignable<T>::value << '\n'
         << " is_trivially_move_assignable<inplace_vector<T,1>>    " << is_trivially_move_assignable<IV>::value << '\n' //
+        << '\n'
+        << " is_trivially_destructible<T>                         " << is_trivially_destructible<T>::value << '\n'
+        << " is_trivially_destructible<inplace_vector<T,1>>       " << is_trivially_destructible<IV>::value << '\n' //
         ;
     std::cout << oss.str();
 }
@@ -266,13 +267,14 @@ int main() {
     {
         std::cout << " tmp <- iv" << std::endl;
         IVS tmp(std::move(iv));
+        assert(iv.size() == 0);
         std::cout << " iv <- other" << std::endl;
         iv = std::move(other);
         std::cout << " other <- tmp" << std::endl;
         other = std::move(tmp);
         std::cout << " done" << std::endl;
         assert(iv.size() == 0);
-        assert(other.size() == 4);
+        ASSERT_EQ(other.size(), 4u);
     }
     std::cout << "--- std::swap\n";
     {
@@ -441,7 +443,7 @@ int main() {
     {
         inplace_vector<NonDefaultConstructible, 4> foo;
         // TODO: Fix so this passes?
-        //static_assert(std::is_trivially_copyable<typename std::remove_reference<decltype(foo)>::type>::value, "");
+        // static_assert(std::is_trivially_copyable<typename std::remove_reference<decltype(foo)>::type>::value, "");
         for(int i = 0; i < 4; ++i) {
             foo.emplace_back(i);
         }
