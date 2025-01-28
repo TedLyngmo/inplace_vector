@@ -352,6 +352,7 @@ int main() {
         assert(iv.size() == 4);
         for(auto& str : iv) std::cout << str << '\n';
     }
+    std::cout << "--- exception\n";
     {
         bool ex = false;
         try {
@@ -362,6 +363,17 @@ int main() {
         assert(ex == true);
         assert(iv.try_push_back("nope") == nullptr);
         assert(iv.try_emplace_back("nope") == nullptr);
+    }
+    std::cout << "--- copying\n";
+    {
+        auto copy = iv;
+        assert(iv.size() == 4);
+        assert(copy.size() == 4);
+        iv.clear();
+        assert(iv.size() == 0);
+        iv = copy;
+        assert(iv.size() == 4);
+        assert(iv == copy);
     }
     std::cout << "--- comparisons\n";
     {

@@ -288,7 +288,7 @@ namespace lyn_inplace_vector_detail {
             TRACE_ENTER("operator=(const non_trivial_copy_ass& other)");
             auto& Self = *static_cast<inplace_vector<T, N>*>(this);
             auto& ipo = static_cast<const inplace_vector<T, N>&>(other);
-            Self.assign(ipo.begin(), ipo.begin());
+            Self.assign(ipo.begin(), ipo.end());
             return *this;
         }
         LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ass& operator=(non_trivial_copy_ass&&) noexcept = default;
@@ -322,8 +322,11 @@ namespace lyn_inplace_vector_detail {
     template<class T, std::size_t N>
     struct non_trivial_copy_ctor : move_ass_selector<T, N> {
         LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor() = default;
-        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor(const non_trivial_copy_ctor&) {
+        LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor(const non_trivial_copy_ctor& other) {
             TRACE_ENTER("non_trivial_copy_ctor(const non_trivial_copy_ctor& other)");
+            for(decltype(this->size()) idx = 0 ; idx != other.size(); ++idx) {
+                this->construct_back(other.ref(idx));
+            }
         }
         LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor(non_trivial_copy_ctor&&) noexcept = default;
         LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor& operator=(const non_trivial_copy_ctor& other) = default;
@@ -455,6 +458,7 @@ public:
     template<class InputIt, class U = T>
     LYNIPV_CXX14_CONSTEXPR auto assign(InputIt first, InputIt last) ->
         typename std::enable_if<std::is_constructible<U, typename std::iterator_traits<InputIt>::value_type>::value>::type {
+        TRACE_ENTER("assign(InputIt first, InputIt last) ", std::distance(first, last));
         clear();
         std::copy(first, last, std::back_inserter(*this));
     }
