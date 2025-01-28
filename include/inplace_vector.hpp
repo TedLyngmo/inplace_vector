@@ -286,9 +286,10 @@ namespace lyn_inplace_vector_detail {
         LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ass(non_trivial_copy_ass&&) noexcept = default;
         LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ass& operator=(const non_trivial_copy_ass& other) {
             TRACE_ENTER("operator=(const non_trivial_copy_ass& other)");
-            auto& Self = *static_cast<inplace_vector<T, N>*>(this);
-            auto& ipo = static_cast<const inplace_vector<T, N>&>(other);
-            Self.assign(ipo.begin(), ipo.end());
+            this->clear(); // may copy assign std::min(size(), other.size()) elements
+            for(decltype(this->size()) idx = 0 ; idx != other.size(); ++idx) {
+                this->construct_back(other.ref(idx));
+            }
             return *this;
         }
         LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ass& operator=(non_trivial_copy_ass&&) noexcept = default;
@@ -304,14 +305,13 @@ namespace lyn_inplace_vector_detail {
         LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass(const non_trivial_move_ass&) = default;
         LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass(non_trivial_move_ass&&) noexcept = default;
         LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass& operator=(const non_trivial_move_ass&) = default;
-        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass& operator=(non_trivial_move_ass&& other) noexcept(
-            std::is_nothrow_move_assignable<T>::value && std::is_nothrow_move_constructible<T>::value) {
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass& operator=(non_trivial_move_ass&& other) noexcept(std::is_nothrow_move_assignable<T>::value && std::is_nothrow_move_constructible<T>::value) {
             TRACE_ENTER("operator=(non_trivial_move_ass&& other)");
-            auto& Self = *static_cast<inplace_vector<T, N>*>(this);
-            auto& ipo = static_cast<inplace_vector<T, N>&>(other);
-            Self.clear();
-            std::move(ipo.begin(), ipo.end(), std::back_inserter(Self));
-            ipo.clear();
+            this->clear(); // may move assign std::min(size(), other.size()) elements
+            for(decltype(this->size()) idx = 0; idx != other.size(); ++idx) {
+                this->construct_back(std::move(other.ref(idx)));
+            }
+            other.clear();
             return *this;
         }
     };
@@ -347,7 +347,7 @@ namespace lyn_inplace_vector_detail {
             for(decltype(this->size()) idx = 0; idx != other.size(); ++idx) {
                 this->construct_back(std::move(other.ref(idx)));
             }
-            static_cast<inplace_vector<T, N>&>(other).clear();
+            other.clear();
         }
         LYNIPV_CXX14_CONSTEXPR non_trivial_move_ctor& operator=(const non_trivial_move_ctor& other) = default;
         LYNIPV_CXX14_CONSTEXPR non_trivial_move_ctor& operator=(non_trivial_move_ctor&&) noexcept = default;
