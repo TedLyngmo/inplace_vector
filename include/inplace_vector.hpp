@@ -61,11 +61,13 @@ namespace lyn_inplace_vector_detail {
 
 #if __cplusplus >= 201703L
 # define LYNIPV_LAUNDER(x) std::launder(x)
+# define LYNIPV_MAYBE_UNUSED [[maybe_unused]]
     using std::is_nothrow_swappable;
     template<class... B>
     using conjunction = std::conjunction<B...>;
 #else
 # define LYNIPV_LAUNDER(x) x
+# define LYNIPV_MAYBE_UNUSED
     template<typename U>
     struct is_nothrow_swappable : std::integral_constant<bool, noexcept(swap(std::declval<U&>(), std::declval<U&>()))> {};
 
@@ -114,11 +116,14 @@ namespace lyn_inplace_vector_detail {
     template<class T, std::size_t N>
     struct constexpr_compat :
         std::integral_constant<
-            bool, N == 0 || (std::is_trivially_default_constructible<T>::value && std::is_trivially_copyable<T>::value &&
-                             // extra req. for now:
-                             std::is_trivially_copy_constructible<T>::value && std::is_trivially_move_constructible<T>::value &&
-                             std::is_trivially_copy_assignable<T>::value && std::is_trivially_move_assignable<T>::value &&
-                             std::is_trivially_destructible<T>::value)> {};
+            bool, N == 0 || (std::is_trivially_default_constructible<T>::value && std::is_trivially_copyable<T>::value
+                             /* the four biggest implementations agree that the combination of the two above implies:
+                             && std::is_trivially_copy_constructible<T>::value
+                             && std::is_trivially_move_constructible<T>::value
+                             && std::is_trivially_copy_assignable<T>::value
+                             && std::is_trivially_move_assignable<T>::value
+                             && std::is_trivially_destructible<T>::value */
+                    )> {};
 
     template<class T, std::size_t N>
     struct trivial_copy_ctor :
@@ -171,8 +176,8 @@ namespace lyn_inplace_vector_detail {
         constexpr size_type size() const noexcept { return 0; }
         LYNIPV_CXX14_CONSTEXPR void clear() noexcept {}
 
-        LYNIPV_CXX14_CONSTEXPR size_type inc() { return 0; }
-        LYNIPV_CXX14_CONSTEXPR size_type dec(size_type = 1) { return 0; }
+        LYNIPV_MAYBE_UNUSED LYNIPV_CXX14_CONSTEXPR size_type inc() { return 0; }
+        LYNIPV_MAYBE_UNUSED LYNIPV_CXX14_CONSTEXPR size_type dec(size_type = 1) { return 0; }
     };
 
     template<class T, std::size_t N>
@@ -206,8 +211,8 @@ namespace lyn_inplace_vector_detail {
         constexpr size_type size() const noexcept { return m_size; }
         LYNIPV_CXX14_CONSTEXPR void clear() noexcept { m_size = 0; }
 
-        LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
-        LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
+        LYNIPV_MAYBE_UNUSED LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
+        LYNIPV_MAYBE_UNUSED LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
 
     private:
         std::array<value_type, N> m_data;
@@ -242,8 +247,8 @@ namespace lyn_inplace_vector_detail {
 
         constexpr size_type size() const noexcept { return m_size; }
 
-        LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
-        LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
+        LYNIPV_MAYBE_UNUSED LYNIPV_CXX14_CONSTEXPR size_type inc() noexcept { return ++m_size; }
+        LYNIPV_MAYBE_UNUSED LYNIPV_CXX14_CONSTEXPR size_type dec(size_type count = 1) noexcept { return m_size -= count; }
         LYNIPV_CXX14_CONSTEXPR void clear() noexcept(std::is_nothrow_destructible<T>::value) {
             while(m_size) {
                 destroy(--m_size);
@@ -833,5 +838,6 @@ LYNIPV_CXX14_CONSTEXPR typename inplace_vector<T, N>::size_type erase_if(inplace
 #undef LYNIPV_CXX20_CONSTEXPR
 #undef LYNIPV_CONSTRUCT_AT
 #undef LYNIPV_LAUNDER
+#undef LYNIPV_MAYBE_UNUSED
 
 #endif
