@@ -129,13 +129,13 @@ namespace lyn_inplace_vector_detail {
     template<class T, std::size_t N>
     struct trivial_copy_ctor :
         std::integral_constant<bool,
-                               N == 0 || (std::is_copy_constructible<T>::value && std::is_trivially_copy_constructible<T>::value)> {
+                               N == 0 || std::is_trivially_copy_constructible<T>::value> {
     };
 
     template<class T, std::size_t N>
     struct trivial_move_ctor :
         std::integral_constant<bool,
-                               N == 0 || (std::is_move_constructible<T>::value && std::is_trivially_move_constructible<T>::value)> {
+                               N == 0 || std::is_trivially_move_constructible<T>::value> {
     };
 
     template<class T, std::size_t N>
