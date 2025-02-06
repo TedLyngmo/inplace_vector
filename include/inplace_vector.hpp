@@ -40,12 +40,13 @@ For more information, please refer to <https://unlicense.org>
 #include <iterator>
 #include <memory>
 #include <new>
-#if __cplusplus >= 202002L
-# include <ranges>
-#endif
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
+#if __cplusplus >= 202002L
+# include <compare>
+# include <ranges>
+#endif
 
 namespace lyn {
 
