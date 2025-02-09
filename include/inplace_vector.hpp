@@ -116,27 +116,21 @@ namespace lyn_inplace_vector_detail {
     // base requirements
     template<class T, std::size_t N>
     struct constexpr_compat :
-        std::integral_constant<
-            bool, N == 0 || (std::is_trivially_default_constructible<T>::value && std::is_trivially_copyable<T>::value
-                             /* the four biggest implementations agree that the combination of the two above implies:
-                             && std::is_trivially_copy_constructible<T>::value
-                             && std::is_trivially_move_constructible<T>::value
-                             && std::is_trivially_copy_assignable<T>::value
-                             && std::is_trivially_move_assignable<T>::value
-                             && std::is_trivially_destructible<T>::value */
-                    )> {};
+        std::integral_constant<bool,
+                               N == 0 || (std::is_trivially_default_constructible<T>::value && std::is_trivially_copyable<T>::value
+                                          /* the four biggest implementations agree that the combination of the two above implies:
+                                          && std::is_trivially_copy_constructible<T>::value
+                                          && std::is_trivially_move_constructible<T>::value
+                                          && std::is_trivially_copy_assignable<T>::value
+                                          && std::is_trivially_move_assignable<T>::value
+                                          && std::is_trivially_destructible<T>::value */
+                                          )> {};
 
     template<class T, std::size_t N>
-    struct trivial_copy_ctor :
-        std::integral_constant<bool,
-                               N == 0 || std::is_trivially_copy_constructible<T>::value> {
-    };
+    struct trivial_copy_ctor : std::integral_constant<bool, N == 0 || std::is_trivially_copy_constructible<T>::value> {};
 
     template<class T, std::size_t N>
-    struct trivial_move_ctor :
-        std::integral_constant<bool,
-                               N == 0 || std::is_trivially_move_constructible<T>::value> {
-    };
+    struct trivial_move_ctor : std::integral_constant<bool, N == 0 || std::is_trivially_move_constructible<T>::value> {};
 
     template<class T, std::size_t N>
     struct trivial_copy_ass :
@@ -269,7 +263,11 @@ namespace lyn_inplace_vector_detail {
     };
 
     template<class T, std::size_t N>
-    struct non_trivial_destructor : aligned_storage_non_trivial<T, N> {
+    struct storage_selector :
+        std::conditional<constexpr_compat<T, N>::value, aligned_storage_trivial<T, N>, aligned_storage_non_trivial<T, N>>::type {};
+
+    template<class T, std::size_t N>
+    struct non_trivial_destructor : storage_selector<T, N> {
         LYNIPV_CXX14_CONSTEXPR non_trivial_destructor() = default;
         LYNIPV_CXX14_CONSTEXPR non_trivial_destructor(const non_trivial_destructor&) = default;
         LYNIPV_CXX14_CONSTEXPR non_trivial_destructor(non_trivial_destructor&&) noexcept = default;
@@ -282,8 +280,7 @@ namespace lyn_inplace_vector_detail {
     };
     template<class T, std::size_t N>
     struct dtor_selector :
-        std::conditional<std::is_trivially_destructible<T>::value, aligned_storage_non_trivial<T, N>,
-                         non_trivial_destructor<T, N>>::type {};
+        std::conditional<std::is_trivially_destructible<T>::value, storage_selector<T, N>, non_trivial_destructor<T, N>>::type {};
 
     template<class T, std::size_t N>
     struct non_trivial_copy_ass : dtor_selector<T, N> {
@@ -293,7 +290,7 @@ namespace lyn_inplace_vector_detail {
         LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ass& operator=(const non_trivial_copy_ass& other) {
             TRACE_ENTER("operator=(const non_trivial_copy_ass& other)");
             this->clear(); // may copy assign std::min(size(), other.size()) elements
-            for(decltype(this->size()) idx = 0 ; idx != other.size(); ++idx) {
+            for(decltype(this->size()) idx = 0; idx != other.size(); ++idx) {
                 this->construct_back(other.ref(idx));
             }
             return *this;
@@ -311,7 +308,8 @@ namespace lyn_inplace_vector_detail {
         LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass(const non_trivial_move_ass&) = default;
         LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass(non_trivial_move_ass&&) noexcept = default;
         LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass& operator=(const non_trivial_move_ass&) = default;
-        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass& operator=(non_trivial_move_ass&& other) noexcept(std::is_nothrow_move_assignable<T>::value && std::is_nothrow_move_constructible<T>::value) {
+        LYNIPV_CXX14_CONSTEXPR non_trivial_move_ass& operator=(non_trivial_move_ass&& other) noexcept(
+            std::is_nothrow_move_assignable<T>::value && std::is_nothrow_move_constructible<T>::value) {
             TRACE_ENTER("operator=(non_trivial_move_ass&& other)");
             this->clear(); // may move assign std::min(size(), other.size()) elements
             for(decltype(this->size()) idx = 0; idx != other.size(); ++idx) {
@@ -330,7 +328,7 @@ namespace lyn_inplace_vector_detail {
         LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor() = default;
         LYNIPV_CXX14_CONSTEXPR non_trivial_copy_ctor(const non_trivial_copy_ctor& other) {
             TRACE_ENTER("non_trivial_copy_ctor(const non_trivial_copy_ctor& other)");
-            for(decltype(this->size()) idx = 0 ; idx != other.size(); ++idx) {
+            for(decltype(this->size()) idx = 0; idx != other.size(); ++idx) {
                 this->construct_back(other.ref(idx));
             }
         }
@@ -364,11 +362,7 @@ namespace lyn_inplace_vector_detail {
         std::conditional<trivial_move_ctor<T, N>::value, copy_ctor_selector<T, N>, non_trivial_move_ctor<T, N>>::type {};
 
     template<class T, std::size_t N>
-    struct trivial_selector :
-        std::conditional<constexpr_compat<T, N>::value, aligned_storage_trivial<T, N>, move_ctor_selector<T, N>>::type {};
-
-    template<class T, std::size_t N>
-    struct base_selector : std::conditional<N == 0, aligned_storage_empty<T>, trivial_selector<T, N>>::type {};
+    struct base_selector : std::conditional<N == 0, aligned_storage_empty<T>, move_ctor_selector<T, N>>::type {};
 } // namespace lyn_inplace_vector_detail
 
 template<class T, std::size_t N>
